@@ -30,12 +30,11 @@ EXCEL_FILE = "data_cover.xlsx"
 
 # --- FUNGSI INTEGRASI GITHUB (TERHUBUNG KE st.secrets) ---
 def sync_to_github_background(file_path):
-  """Fungsi otomatis yang membaca token dari st.secrets untuk sync ke GitHub"""
   try:
     if "github" in st.secrets and os.path.exists(file_path):
       gh = st.secrets["github"]
       token = gh.get("token")
-      repo = gh.get("repo")  # Format: "username/nama-repo"
+      repo = gh.get("repo")
       branch = gh.get("branch", "main")
 
       if token and repo:
@@ -45,18 +44,15 @@ def sync_to_github_background(file_path):
             "Accept": "application/vnd.github+json",
         }
 
-        # Cek SHA file lama di GitHub (diperlukan GitHub API untuk update file)
         sha = None
         r_get = requests.get(url, headers=headers)
         if r_get.status_code == 200:
           sha = r_get.json().get("sha")
 
-        # Baca file excel lokal dan encode ke base64
         with open(file_path, "rb") as f:
           content_bytes = f.read()
         content_encoded = base64.b64encode(content_bytes).decode("utf-8")
 
-        # Kirim data terbaru ke GitHub
         payload = {
             "message": f"Auto-sync data_cover.xlsx via Streamlit {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             "content": content_encoded,
@@ -70,7 +66,7 @@ def sync_to_github_background(file_path):
     pass
 
 
-# Fungsi memuat data (diberi cache agar loading cepat dan tidak lelet di HP)
+# Fungsi memuat data
 @st.cache_data(ttl=600, show_spinner=False)
 def load_data():
   if os.path.exists(EXCEL_FILE):
@@ -110,9 +106,15 @@ for i in range(1, 5):
 
 # Fungsi untuk menentukan ID berikutnya secara otomatis
 def get_next_id():
-  if not df.empty and "ID" in df.columns:
+  # Baca langsung dari file fisik agar ID selalu akurat
+  if os.path.exists(EXCEL_FILE):
+    df_check = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+  else:
+    df_check = df
+
+  if not df_check.empty and "ID" in df_check.columns:
     try:
-      valid_ids = pd.to_numeric(df["ID"], errors="coerce").dropna()
+      valid_ids = pd.to_numeric(df_check["ID"], errors="coerce").dropna()
       if not valid_ids.empty:
         return int(valid_ids.max()) + 1
     except Exception:
@@ -220,45 +222,6 @@ def tampilkan_detail_tambahan(hasil_row):
           p_file, cap_text = list_foto_tersedia[i + j]
           with cols[j]:
             st.image(p_file, caption=cap_text, use_container_width=True)
-
-
-# ----------------- LOGIKA DIALOG POP-UP -----------------
-@st.dialog("⚠️ Konfirmasi Simpan Data")
-def dialog_konfirmasi_tambah(data_baru):
-  st.write("Apakah data sudah benar?")
-  col1, col2 = st.columns(2)
-  with col1:
-    if st.button("✅ Ya, Simpan", use_container_width=True):
-      global df
-      df = pd.concat([df, pd.DataFrame([data_baru])], ignore_index=True)
-      df.to_excel(EXCEL_FILE, index=False)
-      sync_to_github_background(EXCEL_FILE)
-      st.cache_data.clear()
-      st.session_state["notif_sukses"] = "✅ Data berhasil ditambahkan!"
-      st.rerun()
-  with col2:
-    if st.button("❌ Batal", use_container_width=True):
-      st.rerun()
-
-
-@st.dialog("⚠️ Konfirmasi Perubahan Data")
-def dialog_konfirmasi_edit(idx_pilih, data_update):
-  st.write("Apakah data yang diubah sudah benar?")
-  col1, col2 = st.columns(2)
-  with col1:
-    if st.button("✅ Ya, Update", use_container_width=True):
-      global df
-      for k, v in data_update.items():
-        df.loc[idx_pilih, k] = v
-
-      df.to_excel(EXCEL_FILE, index=False)
-      sync_to_github_background(EXCEL_FILE)
-      st.cache_data.clear()
-      st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
-      st.rerun()
-  with col2:
-    if st.button("❌ Batal", use_container_width=True):
-      st.rerun()
 
 
 kolom_sembunyi = ["Catatan", "Pilihan_Edit", "Foto1", "Foto2", "Foto3", "Foto4"]
@@ -446,11 +409,11 @@ elif menu == "➕ Tambah / Edit Data":
     ]
     kolom_foto_list = ["Foto1", "Foto2", "Foto3", "Foto4"]
 
-    list_merek_excel = sorted([
-        str(m)
+    list_merek_excel = sorted(list(set([
+        str(m).strip()
         for m in df["Merek"].dropna().unique()
         if str(m).strip() != "" and str(m).lower() != "nan"
-    ])
+    ])))
     if not list_merek_excel:
       list_merek_excel = ["Toyota", "Honda", "Daihatsu", "Suzuki"]
 
@@ -567,18 +530,24 @@ elif menu == "➕ Tambah / Edit Data":
           )
 
         if st.form_submit_button("Simpan Data Baru"):
-          duplikat_cek = df[
-              (df["Merek"].str.strip().str.lower() == str(input_merek).strip().lower())
-              & (df["Model"].str.strip().str.lower() == str(input_model).strip().lower())
+          # Baca ulang data langsung dari file fisik agar data selalu fresh
+          if os.path.exists(EXCEL_FILE):
+            df_terbaru = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+          else:
+            df_terbaru = df.copy()
+
+          duplikat_cek = df_terbaru[
+              (df_terbaru["Merek"].str.strip().str.lower() == str(input_merek).strip().lower())
+              & (df_terbaru["Model"].str.strip().str.lower() == str(input_model).strip().lower())
               & (
                   (
-                      df["Tahun"].str.strip().str.lower()
+                      df_terbaru["Tahun"].str.strip().str.lower()
                       == str(input_tahun).strip().lower()
                   )
                   if input_tahun.strip() != ""
                   else True
               )
-              & (df["ID"].astype(str).str.strip() != "")
+              & (df_terbaru["ID"].astype(str).str.strip() != "")
           ]
 
           if any(not str(baru.get(k)).strip() for k in kolom_wajib):
@@ -603,7 +572,16 @@ elif menu == "➕ Tambah / Edit Data":
               else:
                 baru[key_f] = ""
 
-            dialog_konfirmasi_tambah(baru)
+            # Simpan langsung ke file Excel fisik
+            df_baru_item = pd.DataFrame([baru])
+            df_final = pd.concat([df_terbaru, df_baru_item], ignore_index=True)
+            df_final.to_excel(EXCEL_FILE, index=False)
+
+            sync_to_github_background(EXCEL_FILE)
+            st.cache_data.clear()
+
+            st.session_state["notif_sukses"] = "✅ Data berhasil ditambahkan dan tersimpan ke Excel!"
+            st.rerun()
     else:
       df_aktif = df[df["ID"].astype(str).str.strip() != ""]
       if df_aktif.empty:
@@ -746,6 +724,12 @@ elif menu == "➕ Tambah / Edit Data":
                   " harus diisi!"
               )
             else:
+              # Baca ulang data terbaru dari file fisik Excel
+              if os.path.exists(EXCEL_FILE):
+                df_terbaru = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+              else:
+                df_terbaru = df.copy()
+
               waktu_sekarang = datetime.now().strftime("%d-%m-%Y %H:%M")
               catatan_input_user = update.get("Catatan", "")
               catatan_bersih = re.sub(
@@ -770,4 +754,15 @@ elif menu == "➕ Tambah / Edit Data":
                 else:
                   update[key_f] = foto_lama[key_f]
 
-              dialog_konfirmasi_edit(idx_pilih, update)
+              # Tulis perubahan ke dataframe terbaru lalu simpan ke Excel
+              for k, v in update.items():
+                if k in df_terbaru.columns:
+                  df_terbaru.loc[idx_pilih, k] = v
+
+              df_terbaru.to_excel(EXCEL_FILE, index=False)
+
+              sync_to_github_background(EXCEL_FILE)
+              st.cache_data.clear()
+
+              st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui dan tersimpan ke Excel!"
+              st.rerun()
