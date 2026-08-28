@@ -9,8 +9,11 @@ import streamlit as st
 # Konfigurasi halaman (Harus paling atas)
 st.set_page_config(page_title="Aplikasi Cover Mobil TDC")
 
-# Folder penyimpanan foto
-FOTO_FOLDER = "foto_cover"
+# Folder penyimpanan foto di direktori aktif lokal
+BASE_DIR = os.getcwd()
+EXCEL_FILE = os.path.join(BASE_DIR, "data_cover.xlsx")
+FOTO_FOLDER = os.path.join(BASE_DIR, "foto_cover")
+
 if not os.path.exists(FOTO_FOLDER):
   os.makedirs(FOTO_FOLDER)
 
@@ -24,8 +27,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-EXCEL_FILE = "data_cover.xlsx"
 
 
 # --- FUNGSI INTEGRASI GITHUB ---
@@ -41,7 +42,7 @@ def sync_to_github_background(file_path):
       branch = gh.get("branch", "main")
 
       if token and repo:
-        url = f"https://api.github.com/repos/{repo}/contents/{file_path}"
+        url = f"https://api.github.com/repos/{repo}/contents/data_cover.xlsx"
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
@@ -69,13 +70,10 @@ def sync_to_github_background(file_path):
     pass
 
 
-# Fungsi memuat data langsung dari file fisik (Tanpa Cache)
+# Fungsi memuat data langsung dari file fisik lokal (Tanpa Cache)
 def load_data():
   target_file = EXCEL_FILE
-  if target_file.startswith("~$"):
-    target_file = "data_cover.xlsx"
-
-  if os.path.exists(target_file) and not target_file.startswith("~$"):
+  if os.path.exists(target_file) and not os.path.basename(target_file).startswith("~$"):
     try:
       df = pd.read_excel(target_file, dtype=str, keep_default_na=False)
       for i in range(1, 5):
@@ -104,7 +102,7 @@ for i in range(1, 5):
 # Fungsi untuk menentukan ID berikutnya secara akurat (Anti-Loncat)
 def get_next_id():
   df_check = None
-  if os.path.exists(EXCEL_FILE) and not EXCEL_FILE.startswith("~$"):
+  if os.path.exists(EXCEL_FILE) and not os.path.basename(EXCEL_FILE).startswith("~$"):
     try:
       df_check = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
     except Exception:
@@ -135,7 +133,7 @@ def highlight_cols(x):
   return df_styler
 
 
-# --- LOGIKA DIALOG POP-UP SIMPAN & EDIT (DENGAN PELACAK PATH) ---
+# --- LOGIKA DIALOG POP-UP SIMPAN & EDIT ---
 @st.dialog("⚠️ Konfirmasi Simpan Data")
 def dialog_konfirmasi_tambah(data_baru):
   st.write("Apakah data sudah benar?")
@@ -143,8 +141,6 @@ def dialog_konfirmasi_tambah(data_baru):
   with col1:
     if st.button("✅ Ya, Simpan", use_container_width=True):
       try:
-        path_absolut = os.path.abspath(EXCEL_FILE)
-        
         if os.path.exists(EXCEL_FILE):
           current_df = pd.read_excel(
               EXCEL_FILE, dtype=str, keep_default_na=False
@@ -161,7 +157,7 @@ def dialog_konfirmasi_tambah(data_baru):
         sync_to_github_background(EXCEL_FILE)
 
         st.session_state["notif_sukses"] = (
-            f"✅ Data ID {data_baru['ID']} berhasil disimpan! (Path: {path_absolut})"
+            f"✅ Data ID {data_baru['ID']} berhasil disimpan ke file Excel lokal!"
         )
         st.rerun()
 
@@ -584,7 +580,7 @@ elif menu == "➕ Tambah / Edit Data":
         if st.form_submit_button("Simpan Data Baru"):
           df_submit_check = (
               pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
-              if os.path.exists(EXCEL_FILE) and not EXCEL_FILE.startswith("~$")
+              if os.path.exists(EXCEL_FILE) and not os.path.basename(EXCEL_FILE).startswith("~$")
               else df
           )
           duplikat_cek = df_submit_check[
