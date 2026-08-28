@@ -69,7 +69,7 @@ def sync_to_github_background(file_path):
     pass
 
 
-# Fungsi memuat data langsung dari file fisik (Tanpa Cache yang bikin nyangkut)
+# Fungsi memuat data langsung dari file fisik (Tanpa Cache)
 def load_data():
   target_file = EXCEL_FILE
   if target_file.startswith("~$"):
@@ -135,7 +135,7 @@ def highlight_cols(x):
   return df_styler
 
 
-# --- LOGIKA DIALOG POP-UP SIMPAN & EDIT ---
+# --- LOGIKA DIALOG POP-UP SIMPAN & EDIT (DENGAN PELACAK PATH) ---
 @st.dialog("⚠️ Konfirmasi Simpan Data")
 def dialog_konfirmasi_tambah(data_baru):
   st.write("Apakah data sudah benar?")
@@ -143,6 +143,8 @@ def dialog_konfirmasi_tambah(data_baru):
   with col1:
     if st.button("✅ Ya, Simpan", use_container_width=True):
       try:
+        path_absolut = os.path.abspath(EXCEL_FILE)
+        
         if os.path.exists(EXCEL_FILE):
           current_df = pd.read_excel(
               EXCEL_FILE, dtype=str, keep_default_na=False
@@ -159,17 +161,12 @@ def dialog_konfirmasi_tambah(data_baru):
         sync_to_github_background(EXCEL_FILE)
 
         st.session_state["notif_sukses"] = (
-            f"✅ Data Calya (ID {data_baru['ID']}) berhasil disimpan permanen ke Excel & GitHub!"
+            f"✅ Data ID {data_baru['ID']} berhasil disimpan! (Path: {path_absolut})"
         )
         st.rerun()
 
-      except PermissionError:
-        st.error(
-            "❌ **GAGAL SIMPAN!** File `data_cover.xlsx` sedang terbuka di"
-            " Microsoft Excel. Tutup file Excel-nya terlebih dahulu!"
-        )
       except Exception as e:
-        st.error(f"❌ Terjadi kesalahan sistem saat menyimpan: {e}")
+        st.error(f"❌ ERROR NYATA: {e}")
 
   with col2:
     if st.button("❌ Batal", use_container_width=True):
@@ -200,11 +197,6 @@ def dialog_konfirmasi_edit(idx_pilih, data_update):
         st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
         st.rerun()
 
-      except PermissionError:
-        st.error(
-            "❌ **GAGAL UPDATE!** File `data_cover.xlsx` sedang terbuka di"
-            " Microsoft Excel. Harap tutup file Excel-nya!"
-        )
       except Exception as e:
         st.error(f"Terjadi kesalahan sistem: {e}")
 
