@@ -188,7 +188,7 @@ def dialog_konfirmasi_tambah(data_baru):
       global df
       df = pd.concat([df, pd.DataFrame([data_baru])], ignore_index=True)
       df.to_excel(EXCEL_FILE, index=False)
-      st.cache_data.clear()  # Bersihkan cache agar data terbaru langsung terbaca
+      st.cache_data.clear()
       st.session_state["notif_sukses"] = "✅ Data berhasil ditambahkan!"
       st.rerun()
   with col2:
@@ -207,7 +207,7 @@ def dialog_konfirmasi_edit(idx_pilih, data_update):
         df.loc[idx_pilih, k] = v
 
       df.to_excel(EXCEL_FILE, index=False)
-      st.cache_data.clear()  # Bersihkan cache agar data terbaru langsung terbaca
+      st.cache_data.clear()
       st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
       st.rerun()
   with col2:
@@ -233,9 +233,8 @@ if menu == "🔍 Cari Ukuran Cover":
       daftar_model = sorted(
           [m for m in df_merk["Model"].dropna().unique() if m != ""]
       )
-      model_pilihan = st.selectbox(
-          "Pilih Model:", daftar_model, accept_new_options=True
-      )
+      # DI SINI DIKEMBALIKAN TANPA accept_new_options (Murni pilihan data yang ada)
+      model_pilihan = st.selectbox("Pilih Model:", daftar_model)
       df_model = df_merk[df_merk["Model"] == model_pilihan]
 
       daftar_tahun = sorted(
