@@ -230,7 +230,10 @@ if menu == "🔍 Cari Ukuran Cover":
       daftar_model = sorted(
           [m for m in df_merk["Model"].dropna().unique() if m != ""]
       )
-      model_pilihan = st.selectbox("Pilih Model:", daftar_model)
+      # DIUBAH AGAR BISA DIKETIK DI HP: ditambahkan accept_new_options=True
+      model_pilihan = st.selectbox(
+          "Pilih Model:", daftar_model, accept_new_options=True
+      )
       df_model = df_merk[df_merk["Model"] == model_pilihan]
 
       daftar_tahun = sorted(
