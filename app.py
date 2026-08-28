@@ -26,7 +26,8 @@ st.markdown(
 EXCEL_FILE = "data_cover.xlsx"
 
 
-# Fungsi memuat data
+# Fungsi memuat data (diberi cache agar loading cepat dan tidak lelet di HP)
+@st.cache_data(ttl=600, show_spinner=False)
 def load_data():
   if os.path.exists(EXCEL_FILE):
     df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
@@ -187,6 +188,7 @@ def dialog_konfirmasi_tambah(data_baru):
       global df
       df = pd.concat([df, pd.DataFrame([data_baru])], ignore_index=True)
       df.to_excel(EXCEL_FILE, index=False)
+      st.cache_data.clear()  # Bersihkan cache agar data terbaru langsung terbaca
       st.session_state["notif_sukses"] = "✅ Data berhasil ditambahkan!"
       st.rerun()
   with col2:
@@ -205,6 +207,7 @@ def dialog_konfirmasi_edit(idx_pilih, data_update):
         df.loc[idx_pilih, k] = v
 
       df.to_excel(EXCEL_FILE, index=False)
+      st.cache_data.clear()  # Bersihkan cache agar data terbaru langsung terbaca
       st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
       st.rerun()
   with col2:
@@ -230,7 +233,6 @@ if menu == "🔍 Cari Ukuran Cover":
       daftar_model = sorted(
           [m for m in df_merk["Model"].dropna().unique() if m != ""]
       )
-      # DIUBAH AGAR BISA DIKETIK DI HP: ditambahkan accept_new_options=True
       model_pilihan = st.selectbox(
           "Pilih Model:", daftar_model, accept_new_options=True
       )
@@ -400,7 +402,6 @@ elif menu == "➕ Tambah / Edit Data":
     ]
     kolom_foto_list = ["Foto1", "Foto2", "Foto3", "Foto4"]
 
-    # Ambil daftar Merek dari database Excel
     list_merek_excel = sorted([
         str(m)
         for m in df["Merek"].dropna().unique()
@@ -409,7 +410,6 @@ elif menu == "➕ Tambah / Edit Data":
     if not list_merek_excel:
       list_merek_excel = ["Toyota", "Honda", "Daihatsu", "Suzuki"]
 
-    # Pilihan status fix 2 opsi
     list_status_fix = ["STANDAR", "HARUS CUSTOM"]
 
     if mode_kelola == "➕ Tambah Data Baru":
@@ -420,7 +420,6 @@ elif menu == "➕ Tambah / Edit Data":
           unsafe_allow_html=True,
       )
 
-      # ID otomatis & terkunci
       st.markdown(
           "ID <span style='color:gray;'>(Otomatis)</span>",
           unsafe_allow_html=True,
@@ -429,7 +428,6 @@ elif menu == "➕ Tambah / Edit Data":
           "ID", value=str(next_id), disabled=True, label_visibility="collapsed"
       )
 
-      # Merek
       st.markdown(
           "Merek <span style='color:red;'>*</span> <span style='font-size:"
           " 11px; color: gray;'>(Pilih dari daftar atau ketik langsung merek"
@@ -444,7 +442,6 @@ elif menu == "➕ Tambah / Edit Data":
           accept_new_options=True,
       )
 
-      # Model (Live Input di Luar Form supaya bisa memunculkan warning seketika)
       st.markdown(
           "Model <span style='color:red;'>*</span>", unsafe_allow_html=True
       )
@@ -452,7 +449,6 @@ elif menu == "➕ Tambah / Edit Data":
           "Model", placeholder="Contoh: 520i/G30", label_visibility="collapsed"
       )
 
-      # Tahun
       st.markdown(
           "Tahun <span style='color:red;'>*</span>", unsafe_allow_html=True
       )
@@ -460,7 +456,6 @@ elif menu == "➕ Tambah / Edit Data":
           "Tahun", placeholder="Contoh: 2018-2023", label_visibility="collapsed"
       )
 
-      # --- FITUR LIVE WARNING DUPLIKAT ---
       if input_model.strip() != "":
         cek_live = df[
             (df["Merek"].str.strip().str.lower() == str(input_merek).strip().lower())
@@ -482,7 +477,6 @@ elif menu == "➕ Tambah / Edit Data":
               f" **'{input_merek}'** sudah terdaftar di database!"
           )
 
-      # Form lanjutan untuk data lainnya & tombol simpan
       with st.form("form_tambah_sisa"):
         baru = {
             "ID": str(next_id),
@@ -504,7 +498,6 @@ elif menu == "➕ Tambah / Edit Data":
             else:
               baru[col] = st.text_input(col)
 
-        # Dropdown khusus untuk Status (Hanya 2 Pilihan)
         st.markdown("Status <span style='color:red;'>*</span>", unsafe_allow_html=True)
         baru["Status"] = st.selectbox(
             "Status", list_status_fix, label_visibility="collapsed"
