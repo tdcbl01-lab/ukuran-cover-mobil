@@ -223,27 +223,45 @@ def tampilkan_detail_tambahan(hasil_row):
             st.image(p_file, caption=cap_text, use_container_width=True)
 
 
-# ----------------- LOGIKA DIALOG POP-UP -----------------
+# ----------------- LOGIKA DIALOG POP-UP DENGAN PROTEKSI EXCEL TERBUKA -----------------
 @st.dialog("⚠️ Konfirmasi Simpan Data")
 def dialog_konfirmasi_tambah(data_baru):
   st.write("Apakah data sudah benar?")
   col1, col2 = st.columns(2)
   with col1:
     if st.button("✅ Ya, Simpan", use_container_width=True):
-      if os.path.exists(EXCEL_FILE):
-        current_df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
-      else:
-        current_df = df
+      try:
+        # Cek apakah file excel terkunci karena sedang dibuka di Microsoft Excel
+        if os.path.exists(EXCEL_FILE):
+          with open(EXCEL_FILE, "a"):
+            pass
+          current_df = pd.read_excel(
+              EXCEL_FILE, dtype=str, keep_default_na=False
+          )
+        else:
+          current_df = df
 
-      updated_df = pd.concat(
-          [current_df, pd.DataFrame([data_baru])], ignore_index=True
-      )
-      updated_df.to_excel(EXCEL_FILE, index=False)
-      sync_to_github_background(EXCEL_FILE)
+        updated_df = pd.concat(
+            [current_df, pd.DataFrame([data_baru])], ignore_index=True
+        )
+        updated_df.to_excel(EXCEL_FILE, index=False)
+        sync_to_github_background(EXCEL_FILE)
 
-      st.cache_data.clear()
-      st.session_state["notif_sukses"] = "✅ Data berhasil ditambahkan ke Excel & GitHub!"
-      st.rerun()
+        st.cache_data.clear()
+        st.session_state["notif_sukses"] = (
+            "✅ Data berhasil ditambahkan ke Excel & GitHub!"
+        )
+        st.rerun()
+
+      except PermissionError:
+        st.error(
+            "❌ **GAGAL SIMPAN!** File `data_cover.xlsx` sedang terbuka di"
+            " Microsoft Excel. Harap **close (tutup) file Excel-nya terlebih"
+            " dahulu** di komputer Anda, lalu klik simpan lagi!"
+        )
+      except Exception as e:
+        st.error(f"Terjadi kesalahan sistem: {e}")
+
   with col2:
     if st.button("❌ Batal", use_container_width=True):
       st.rerun()
@@ -255,21 +273,36 @@ def dialog_konfirmasi_edit(idx_pilih, data_update):
   col1, col2 = st.columns(2)
   with col1:
     if st.button("✅ Ya, Update", use_container_width=True):
-      if os.path.exists(EXCEL_FILE):
-        current_df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
-      else:
-        current_df = df
+      try:
+        if os.path.exists(EXCEL_FILE):
+          with open(EXCEL_FILE, "a"):
+            pass
+          current_df = pd.read_excel(
+              EXCEL_FILE, dtype=str, keep_default_na=False
+          )
+        else:
+          current_df = df
 
-      for k, v in data_update.items():
-        if idx_pilih in current_df.index:
-          current_df.loc[idx_pilih, k] = v
+        for k, v in data_update.items():
+          if idx_pilih in current_df.index:
+            current_df.loc[idx_pilih, k] = v
 
-      current_df.to_excel(EXCEL_FILE, index=False)
-      sync_to_github_background(EXCEL_FILE)
+        current_df.to_excel(EXCEL_FILE, index=False)
+        sync_to_github_background(EXCEL_FILE)
 
-      st.cache_data.clear()
-      st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
-      st.rerun()
+        st.cache_data.clear()
+        st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
+        st.rerun()
+
+      except PermissionError:
+        st.error(
+            "❌ **GAGAL UPDATE!** File `data_cover.xlsx` sedang terbuka di"
+            " Microsoft Excel. Harap **close (tutup) file Excel-nya terlebih"
+            " dahulu**!"
+        )
+      except Exception as e:
+        st.error(f"Terjadi kesalahan sistem: {e}")
+
   with col2:
     if st.button("❌ Batal", use_container_width=True):
       st.rerun()
@@ -504,14 +537,14 @@ elif menu == "➕ Tambah / Edit Data":
           "Model <span style='color:red;'>*</span>", unsafe_allow_html=True
       )
       input_model = st.text_input(
-          "Model", placeholder="Contoh: 520i/G30", label_visibility="collapsed"
+          "Model", placeholder="Contoh: Calya", label_visibility="collapsed"
       )
 
       st.markdown(
           "Tahun <span style='color:red;'>*</span>", unsafe_allow_html=True
       )
       input_tahun = st.text_input(
-          "Tahun", placeholder="Contoh: 2018-2023", label_visibility="collapsed"
+          "Tahun", placeholder="Contoh: 2016-On", label_visibility="collapsed"
       )
 
       if input_model.strip() != "":
@@ -532,7 +565,8 @@ elif menu == "➕ Tambah / Edit Data":
         if not cek_live.empty:
           st.warning(
               f"⚠️ **Peringatan Live:** Model **'{input_model}'** untuk Merek"
-              f" **'{input_merek}'** sudah terdaftar di database!"
+              f" **'{input_merek}'** dengan tahun tersebut sudah terdaftar di"
+              " database!"
           )
 
       with st.form("form_tambah_sisa"):
@@ -603,7 +637,7 @@ elif menu == "➕ Tambah / Edit Data":
           elif not duplikat_cek.empty:
             st.error(
                 f'⚠️ Gagal Disimpan! Model "{input_model}" untuk Merek'
-                f' "{input_merek}" sudah ada di database.'
+                f' "{input_merek}" dengan tahun tersebut sudah ada di database.'
             )
           else:
             timestamp_awalan = int(datetime.now().timestamp())
