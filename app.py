@@ -70,12 +70,12 @@ def sync_to_github_background(file_path):
     pass
 
 
-# Fungsi memuat data langsung dari file fisik lokal (Tanpa Cache)
+# Fungsi memuat data langsung dari file fisik lokal (Menggunakan openpyxl)
 def load_data():
   target_file = EXCEL_FILE
   if os.path.exists(target_file) and not os.path.basename(target_file).startswith("~$"):
     try:
-      df = pd.read_excel(target_file, dtype=str, keep_default_na=False)
+      df = pd.read_excel(target_file, engine="openpyxl", dtype=str, keep_default_na=False)
       for i in range(1, 5):
         col_name = f"Foto{i}"
         if col_name not in df.columns:
@@ -104,7 +104,7 @@ def get_next_id():
   df_check = None
   if os.path.exists(EXCEL_FILE) and not os.path.basename(EXCEL_FILE).startswith("~$"):
     try:
-      df_check = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+      df_check = pd.read_excel(EXCEL_FILE, engine="openpyxl", dtype=str, keep_default_na=False)
     except Exception:
       pass
   
@@ -143,7 +143,7 @@ def dialog_konfirmasi_tambah(data_baru):
       try:
         if os.path.exists(EXCEL_FILE):
           current_df = pd.read_excel(
-              EXCEL_FILE, dtype=str, keep_default_na=False
+              EXCEL_FILE, engine="openpyxl", dtype=str, keep_default_na=False
           )
         else:
           current_df = df
@@ -153,7 +153,7 @@ def dialog_konfirmasi_tambah(data_baru):
         updated_df = pd.concat(
             [current_df, pd.DataFrame([data_baru])], ignore_index=True
         )
-        updated_df.to_excel(EXCEL_FILE, index=False)
+        updated_df.to_excel(EXCEL_FILE, index=False, engine="openpyxl")
         sync_to_github_background(EXCEL_FILE)
 
         st.session_state["notif_sukses"] = f"✅ Data ID {data_baru['ID']} berhasil disimpan ke: {EXCEL_FILE}"
@@ -176,7 +176,7 @@ def dialog_konfirmasi_edit(idx_pilih, data_update):
       try:
         if os.path.exists(EXCEL_FILE):
           current_df = pd.read_excel(
-              EXCEL_FILE, dtype=str, keep_default_na=False
+              EXCEL_FILE, engine="openpyxl", dtype=str, keep_default_na=False
           )
         else:
           current_df = df
@@ -185,7 +185,7 @@ def dialog_konfirmasi_edit(idx_pilih, data_update):
           if idx_pilih in current_df.index:
             current_df.loc[idx_pilih, k] = v
 
-        current_df.to_excel(EXCEL_FILE, index=False)
+        current_df.to_excel(EXCEL_FILE, index=False, engine="openpyxl")
         sync_to_github_background(EXCEL_FILE)
 
         st.session_state["notif_sukses"] = f"✏️ Data berhasil diperbarui di: {EXCEL_FILE}"
@@ -577,7 +577,7 @@ elif menu == "➕ Tambah / Edit Data":
 
         if st.form_submit_button("Simpan Data Baru"):
           df_submit_check = (
-              pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+              pd.read_excel(EXCEL_FILE, engine="openpyxl", dtype=str, keep_default_na=False)
               if os.path.exists(EXCEL_FILE) and not os.path.basename(EXCEL_FILE).startswith("~$")
               else df
           )
