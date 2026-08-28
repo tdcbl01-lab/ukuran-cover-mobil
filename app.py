@@ -670,7 +670,7 @@ elif menu == "➕ Tambah / Edit Data":
               if val_lama == "nan" or val_lama == "None":
                 val_lama = ""
 
-              if col == "Catatan" && val_lama:
+              if col == "Catatan" and val_lama:
                 val_lama = re.sub(
                     r"\s*([\|–-]|Terakhir diedit|Diedit tgl|Pernah diedit).*$",
                     "",
