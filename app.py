@@ -5,7 +5,6 @@ import requests
 import streamlit as st
 
 
-# --- FUNGSI AUTO-SYNC KE GITHUB ---
 def push_to_github(file_path, commit_message):
   try:
     token = st.secrets["GITHUB_TOKEN"]
@@ -36,14 +35,10 @@ def push_to_github(file_path, commit_message):
     requests.put(url, headers=headers, json=data)
 
 
-# --- KONFIGURASI HALAMAN STREAMLIT ---
 st.set_page_config(page_title="TDC Variasi - Data App", layout="wide")
 
-# --- MEMBUAT MENU PILIHAN (TAB) DI SIDEBAR ---
-st.sidebar.title("Navigasi Menu")
-menu = st.sidebar.selectbox("Pilih Halaman:", ["Manajemen Data", "Informasi"])
-
-EXCEL_FILE = "data.xlsx"
+# Menggunakan file Excel asli Anda
+EXCEL_FILE = "data_cover.xlsx"
 
 if not os.path.exists(EXCEL_FILE):
   df_default = pd.DataFrame(
@@ -51,26 +46,15 @@ if not os.path.exists(EXCEL_FILE):
   )
   df_default.to_excel(EXCEL_FILE, index=False)
 
-# --- HALAMAN 1: MANAJEMEN DATA ---
-if menu == "Manajemen Data":
-  st.title("TDC Variasi - Manajemen Data & Katalog")
-  st.write("Aplikasi terhubung dengan penyimpanan otomatis ke GitHub.")[cite: 1]
+st.title("TDC Variasi - Manajemen Data & Katalog")
+st.write("Aplikasi terhubung dengan penyimpanan otomatis ke GitHub.")
 
-  df = pd.read_excel(EXCEL_FILE)
+df = pd.read_excel(EXCEL_FILE)
 
-  st.subheader("Data Produk Saat Ini")[cite: 1]
-  edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
+st.subheader("Data Produk Saat Ini")
+edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
 
-  if st.button("Simpan Perubahan & Sinkronkan ke GitHub"):
-    edited_df.to_excel(EXCEL_FILE, index=False)
-    push_to_github(EXCEL_FILE, "Update data Excel via aplikasi Streamlit")
-    st.success("Data berhasil disimpan dan disinkronkan ke GitHub secara otomatis!")[cite: 1]
-
-# --- HALAMAN 2: INFORMASI ---
-elif menu == "Informasi":
-  st.title("Informasi Sistem")
-  st.write(
-      "Halaman ini digunakan untuk melihat panduan atau status koneksi"
-      " repository GitHub Anda."
-  )
-  st.info(f"Repository Aktif: {st.secrets.get('REPO_NAME', 'Belum diset')}")
+if st.button("Simpan Perubahan & Sinkronkan ke GitHub"):
+  edited_df.to_excel(EXCEL_FILE, index=False)
+  push_to_github(EXCEL_FILE, "Update data Excel via aplikasi Streamlit")
+  st.success("Data berhasil disimpan dan disinkronkan ke GitHub secara otomatis!")
