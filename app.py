@@ -6,69 +6,57 @@ import pandas as pd
 import requests
 import streamlit as st
 
-# Konfigurasi halaman (Harus paling atas)
+# Konfigurasi halaman
 st.set_page_config(page_title="Aplikasi Cover Mobil TDC")
 
-# Folder penyimpanan dikunci mutlak ke direktori lokal Documents\GitHub\ukuran-cover-mobil
-BASE_DIR = os.path.join(os.path.expanduser("~"), "Documents", "GitHub", "ukuran-cover-mobil")
-EXCEL_FILE = os.path.join(BASE_DIR, "data_cover.xlsx")
-FOTO_FOLDER = os.path.join(BASE_DIR, "foto_cover")
-
+# Folder penyimpanan foto
+FOTO_FOLDER = "foto_cover"
 if not os.path.exists(FOTO_FOLDER):
   os.makedirs(FOTO_FOLDER)
 
-# CSS Total untuk merapikan tabel & menghilangkan kotak input bayangan selectbox versi baru
+# CSS dasar untuk tabel
 st.markdown(
     """
     <style>
         [data-testid="stDataFrame"] { width: 100% !important; }
         .stDataFrame table { width: 100% !important; }
-        div[data-baseweb="select"] > div { background-color: #f8f9fa; }
-        
-        /* Membuang kotak input teks/combobox bayangan bawaan Streamlit versi baru */
-        div[data-baseweb="select"] input[aria-autocomplete="list"] {
-            position: absolute !important;
-            width: 1px !important;
-            height: 1px !important;
-            overflow: hidden !important;
-            clip: rect(1px, 1px, 1px, 1px) !important;
-            white-space: nowrap !important;
-            border: 0 !important;
-        }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
+EXCEL_FILE = "data_cover.xlsx"
 
-# --- FUNGSI INTEGRASI GITHUB ---
+
+# --- FUNGSI INTEGRASI GITHUB (TERHUBUNG KE st.secrets) ---
 def sync_to_github_background(file_path):
+  """Fungsi otomatis yang membaca token dari st.secrets untuk sync ke GitHub"""
   try:
-    if "data_cover" not in file_path or os.path.basename(file_path).startswith("~$"):
-      return
-
     if "github" in st.secrets and os.path.exists(file_path):
       gh = st.secrets["github"]
       token = gh.get("token")
-      repo = gh.get("repo")
+      repo = gh.get("repo")  # Format: "username/nama-repo"
       branch = gh.get("branch", "main")
 
       if token and repo:
-        url = f"https://api.github.com/repos/{repo}/contents/data_cover.xlsx"
+        url = f"https://api.github.com/repos/{repo}/contents/{file_path}"
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
         }
 
+        # Cek SHA file lama di GitHub (diperlukan GitHub API untuk update file)
         sha = None
         r_get = requests.get(url, headers=headers)
         if r_get.status_code == 200:
           sha = r_get.json().get("sha")
 
+        # Baca file excel lokal dan encode ke base64
         with open(file_path, "rb") as f:
           content_bytes = f.read()
         content_encoded = base64.b64encode(content_bytes).decode("utf-8")
 
+        # Kirim data terbaru ke GitHub
         payload = {
             "message": f"Auto-sync data_cover.xlsx via Streamlit {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             "content": content_encoded,
@@ -82,26 +70,35 @@ def sync_to_github_background(file_path):
     pass
 
 
-# Fungsi memuat data langsung dari file fisik lokal (Menggunakan openpyxl)
+# Fungsi memuat data (diberi cache agar loading cepat dan tidak lelet di HP)
+@st.cache_data(ttl=600, show_spinner=False)
 def load_data():
-  target_file = EXCEL_FILE
-  if os.path.exists(target_file) and not os.path.basename(target_file).startswith("~$"):
-    try:
-      df = pd.read_excel(target_file, engine="openpyxl", dtype=str, keep_default_na=False)
-      for i in range(1, 5):
-        col_name = f"Foto{i}"
-        if col_name not in df.columns:
-          df[col_name] = ""
-      return df
-    except Exception:
-      pass
-      
-  df_dummy = pd.DataFrame(columns=[
-      "ID", "Merek", "Model", "Tahun", "Ukuran", 
-      "Panjang", "Lebar", "Tinggi", "Status", "Catatan", 
-      "Foto1", "Foto2", "Foto3", "Foto4",
-  ])
-  return df_dummy
+  if os.path.exists(EXCEL_FILE):
+    df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+    for i in range(1, 5):
+      col_name = f"Foto{i}"
+      if col_name not in df.columns:
+        df[col_name] = ""
+    return df
+  else:
+    df_dummy = pd.DataFrame(columns=[
+        "ID",
+        "Merek",
+        "Model",
+        "Tahun",
+        "Ukuran",
+        "Panjang",
+        "Lebar",
+        "Tinggi",
+        "Status",
+        "Catatan",
+        "Foto1",
+        "Foto2",
+        "Foto3",
+        "Foto4",
+    ])
+    df_dummy.to_excel(EXCEL_FILE, index=False)
+    return df_dummy
 
 
 df = load_data()
@@ -111,26 +108,15 @@ for i in range(1, 5):
     df[f"Foto{i}"] = ""
 
 
-# Fungsi untuk menentukan ID berikutnya secara akurat (Anti-Loncat)
+# Fungsi untuk menentukan ID berikutnya secara otomatis
 def get_next_id():
-  df_check = None
-  if os.path.exists(EXCEL_FILE) and not os.path.basename(EXCEL_FILE).startswith("~$"):
+  if not df.empty and "ID" in df.columns:
     try:
-      df_check = pd.read_excel(EXCEL_FILE, engine="openpyxl", dtype=str, keep_default_na=False)
-    except Exception:
-      pass
-  
-  if df_check is None or df_check.empty:
-    df_check = df
-
-  if not df_check.empty and "ID" in df_check.columns:
-    try:
-      valid_ids = pd.to_numeric(df_check["ID"].astype(str).str.strip(), errors="coerce").dropna()
+      valid_ids = pd.to_numeric(df["ID"], errors="coerce").dropna()
       if not valid_ids.empty:
         return int(valid_ids.max()) + 1
     except Exception:
       pass
-      
   return 1
 
 
@@ -145,72 +131,6 @@ def highlight_cols(x):
   return df_styler
 
 
-# --- LOGIKA DIALOG POP-UP SIMPAN & EDIT ---
-@st.dialog("⚠️ Konfirmasi Simpan Data")
-def dialog_konfirmasi_tambah(data_baru):
-  st.write("Apakah data sudah benar?")
-  col1, col2 = st.columns(2)
-  with col1:
-    if st.button("✅ Ya, Simpan", use_container_width=True):
-      try:
-        if os.path.exists(EXCEL_FILE):
-          current_df = pd.read_excel(
-              EXCEL_FILE, engine="openpyxl", dtype=str, keep_default_na=False
-          )
-        else:
-          current_df = df
-
-        data_baru["ID"] = str(get_next_id())
-
-        updated_df = pd.concat(
-            [current_df, pd.DataFrame([data_baru])], ignore_index=True
-        )
-        updated_df.to_excel(EXCEL_FILE, index=False, engine="openpyxl")
-        sync_to_github_background(EXCEL_FILE)
-
-        st.session_state["notif_sukses"] = f"✅ Data ID {data_baru['ID']} berhasil disimpan ke: {EXCEL_FILE}"
-        st.rerun()
-
-      except Exception as e:
-        st.error(f"❌ ERROR NYATA: {e}")
-
-  with col2:
-    if st.button("❌ Batal", use_container_width=True):
-      st.rerun()
-
-
-@st.dialog("⚠️ Konfirmasi Perubahan Data")
-def dialog_konfirmasi_edit(idx_pilih, data_update):
-  st.write("Apakah data yang diubah sudah benar?")
-  col1, col2 = st.columns(2)
-  with col1:
-    if st.button("✅ Ya, Update", use_container_width=True):
-      try:
-        if os.path.exists(EXCEL_FILE):
-          current_df = pd.read_excel(
-              EXCEL_FILE, engine="openpyxl", dtype=str, keep_default_na=False
-          )
-        else:
-          current_df = df
-
-        for k, v in data_update.items():
-          if idx_pilih in current_df.index:
-            current_df.loc[idx_pilih, k] = v
-
-        current_df.to_excel(EXCEL_FILE, index=False, engine="openpyxl")
-        sync_to_github_background(EXCEL_FILE)
-
-        st.session_state["notif_sukses"] = f"✏️ Data berhasil diperbarui di: {EXCEL_FILE}"
-        st.rerun()
-
-      except Exception as e:
-        st.error(f"Terjadi kesalahan sistem: {e}")
-
-  with col2:
-    if st.button("❌ Batal", use_container_width=True):
-      st.rerun()
-
-
 # --- SISTEM LOGIN/LOGOUT ---
 if "logged_in" not in st.session_state:
   st.session_state["logged_in"] = False
@@ -219,8 +139,7 @@ if "logged_in" not in st.session_state:
 col_logo, col_tagline = st.columns([1, 2])
 
 with col_logo:
-  if os.path.exists("Logo TDC.png"):
-    st.image("Logo TDC.png", width=160)
+  st.image("Logo TDC.png", width=160)
 
 with col_tagline:
   st.markdown(
@@ -303,6 +222,45 @@ def tampilkan_detail_tambahan(hasil_row):
             st.image(p_file, caption=cap_text, use_container_width=True)
 
 
+# ----------------- LOGIKA DIALOG POP-UP -----------------
+@st.dialog("⚠️ Konfirmasi Simpan Data")
+def dialog_konfirmasi_tambah(data_baru):
+  st.write("Apakah data sudah benar?")
+  col1, col2 = st.columns(2)
+  with col1:
+    if st.button("✅ Ya, Simpan", use_container_width=True):
+      global df
+      df = pd.concat([df, pd.DataFrame([data_baru])], ignore_index=True)
+      df.to_excel(EXCEL_FILE, index=False)
+      sync_to_github_background(EXCEL_FILE)
+      st.cache_data.clear()
+      st.session_state["notif_sukses"] = "✅ Data berhasil ditambahkan!"
+      st.rerun()
+  with col2:
+    if st.button("❌ Batal", use_container_width=True):
+      st.rerun()
+
+
+@st.dialog("⚠️ Konfirmasi Perubahan Data")
+def dialog_konfirmasi_edit(idx_pilih, data_update):
+  st.write("Apakah data yang diubah sudah benar?")
+  col1, col2 = st.columns(2)
+  with col1:
+    if st.button("✅ Ya, Update", use_container_width=True):
+      global df
+      for k, v in data_update.items():
+        df.loc[idx_pilih, k] = v
+
+      df.to_excel(EXCEL_FILE, index=False)
+      sync_to_github_background(EXCEL_FILE)
+      st.cache_data.clear()
+      st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
+      st.rerun()
+  with col2:
+    if st.button("❌ Batal", use_container_width=True):
+      st.rerun()
+
+
 kolom_sembunyi = ["Catatan", "Pilihan_Edit", "Foto1", "Foto2", "Foto3", "Foto4"]
 
 # ----------------- HALAMAN UTAMA -----------------
@@ -315,19 +273,19 @@ if menu == "🔍 Cari Ukuran Cover":
     if not daftar_merek:
       st.warning("Data belum tersedia.")
     else:
-      merek_pilihan = st.selectbox("Pilih Merek:", daftar_merek, key="cari_merek")
+      merek_pilihan = st.selectbox("Pilih Merek:", daftar_merek)
       df_merk = df[df["Merek"] == merek_pilihan]
 
       daftar_model = sorted(
           [m for m in df_merk["Model"].dropna().unique() if m != ""]
       )
-      model_pilihan = st.selectbox("Pilih Model:", daftar_model, key="cari_model")
+      model_pilihan = st.selectbox("Pilih Model:", daftar_model)
       df_model = df_merk[df_merk["Model"] == model_pilihan]
 
       daftar_tahun = sorted(
           [t for t in df_model["Tahun"].dropna().unique() if t != ""]
       )
-      tahun_pilihan = st.selectbox("Pilih Tahun:", daftar_tahun, key="cari_tahun")
+      tahun_pilihan = st.selectbox("Pilih Tahun:", daftar_tahun)
 
       hasil = df_model[
           (df_model["Tahun"] == tahun_pilihan)
@@ -365,7 +323,7 @@ elif menu == "📊 Filter Berdasarkan Ukuran":
     if not daftar_ukuran:
       st.warning("Data ukuran belum tersedia.")
     else:
-      ukuran_pilihan = st.selectbox("Pilih Ukuran Cover:", daftar_ukuran, key="filter_ukuran")
+      ukuran_pilihan = st.selectbox("Pilih Ukuran Cover:", daftar_ukuran)
       df_filter_ukuran = df[
           (df["Ukuran"] == ukuran_pilihan)
           & (df["ID"].astype(str).str.strip() != "")
@@ -488,11 +446,11 @@ elif menu == "➕ Tambah / Edit Data":
     ]
     kolom_foto_list = ["Foto1", "Foto2", "Foto3", "Foto4"]
 
-    list_merek_excel = sorted(list(set([
-        str(m).strip()
+    list_merek_excel = sorted([
+        str(m)
         for m in df["Merek"].dropna().unique()
         if str(m).strip() != "" and str(m).lower() != "nan"
-    ])))
+    ])
     if not list_merek_excel:
       list_merek_excel = ["Toyota", "Honda", "Daihatsu", "Suzuki"]
 
@@ -515,7 +473,9 @@ elif menu == "➕ Tambah / Edit Data":
       )
 
       st.markdown(
-          "Merek <span style='color:red;'>*</span>",
+          "Merek <span style='color:red;'>*</span> <span style='font-size:"
+          " 11px; color: gray;'>(Pilih dari daftar atau ketik langsung merek"
+          " baru)</span>",
           unsafe_allow_html=True,
       )
       input_merek = st.selectbox(
@@ -523,22 +483,43 @@ elif menu == "➕ Tambah / Edit Data":
           list_merek_excel,
           index=0,
           label_visibility="collapsed",
-          key="tambah_merek_pilihan"
+          accept_new_options=True,
       )
 
       st.markdown(
           "Model <span style='color:red;'>*</span>", unsafe_allow_html=True
       )
       input_model = st.text_input(
-          "Model", placeholder="Contoh: Calya", label_visibility="collapsed"
+          "Model", placeholder="Contoh: 520i/G30", label_visibility="collapsed"
       )
 
       st.markdown(
           "Tahun <span style='color:red;'>*</span>", unsafe_allow_html=True
       )
       input_tahun = st.text_input(
-          "Tahun", placeholder="Contoh: 2016-On", label_visibility="collapsed"
+          "Tahun", placeholder="Contoh: 2018-2023", label_visibility="collapsed"
       )
+
+      if input_model.strip() != "":
+        cek_live = df[
+            (df["Merek"].str.strip().str.lower() == str(input_merek).strip().lower())
+            & (df["Model"].str.strip().str.lower() == str(input_model).strip().lower())
+            & (
+                (
+                    df["Tahun"].str.strip().str.lower()
+                    == str(input_tahun).strip().lower()
+                )
+                if input_tahun.strip() != ""
+                else True
+            )
+            & (df["ID"].astype(str).str.strip() != "")
+        ]
+
+        if not cek_live.empty:
+          st.warning(
+              f"⚠️ **Peringatan:** Model **'{input_model}'** untuk Merek"
+              f" **'{input_merek}'** sudah terdaftar di database!"
+          )
 
       with st.form("form_tambah_sisa"):
         baru = {
@@ -563,7 +544,7 @@ elif menu == "➕ Tambah / Edit Data":
 
         st.markdown("Status <span style='color:red;'>*</span>", unsafe_allow_html=True)
         baru["Status"] = st.selectbox(
-            "Status", list_status_fix, label_visibility="collapsed", key="tambah_status"
+            "Status", list_status_fix, label_visibility="collapsed"
         )
 
         st.markdown("---")
@@ -586,29 +567,18 @@ elif menu == "➕ Tambah / Edit Data":
           )
 
         if st.form_submit_button("Simpan Data Baru"):
-          df_submit_check = (
-              pd.read_excel(EXCEL_FILE, engine="openpyxl", dtype=str, keep_default_na=False)
-              if os.path.exists(EXCEL_FILE) and not os.path.basename(EXCEL_FILE).startswith("~$")
-              else df
-          )
-          duplikat_cek = df_submit_check[
-              (
-                  df_submit_check["Merek"].str.strip().str.lower()
-                  == str(input_merek).strip().lower()
-              )
-              & (
-                  df_submit_check["Model"].str.strip().str.lower()
-                  == str(input_model).strip().lower()
-              )
+          duplikat_cek = df[
+              (df["Merek"].str.strip().str.lower() == str(input_merek).strip().lower())
+              & (df["Model"].str.strip().str.lower() == str(input_model).strip().lower())
               & (
                   (
-                      df_submit_check["Tahun"].str.strip().str.lower()
+                      df["Tahun"].str.strip().str.lower()
                       == str(input_tahun).strip().lower()
                   )
                   if input_tahun.strip() != ""
                   else True
               )
-              & (df_submit_check["ID"].astype(str).str.strip() != "")
+              & (df["ID"].astype(str).str.strip() != "")
           ]
 
           if any(not str(baru.get(k)).strip() for k in kolom_wajib):
@@ -619,7 +589,7 @@ elif menu == "➕ Tambah / Edit Data":
           elif not duplikat_cek.empty:
             st.error(
                 f'⚠️ Gagal Disimpan! Model "{input_model}" untuk Merek'
-                f' "{input_merek}" dengan tahun tersebut sudah ada di database.'
+                f' "{input_merek}" sudah ada di database.'
             )
           else:
             timestamp_awalan = int(datetime.now().timestamp())
@@ -648,7 +618,7 @@ elif menu == "➕ Tambah / Edit Data":
             + df_aktif["Model"]
         )
         idx_str = st.selectbox(
-            "Pilih Data:", df_aktif["Pilihan_Edit"].unique(), key="pilih_data_edit"
+            "Pilih Data:", df_aktif["Pilihan_Edit"].unique()
         )
         idx_pilih = int(idx_str.split(" - ")[0])
 
@@ -686,7 +656,7 @@ elif menu == "➕ Tambah / Edit Data":
               list_merek_excel,
               index=default_idx_merek,
               label_visibility="collapsed",
-              key="edit_merek_pilihan"
+              accept_new_options=True,
           )
 
           for col in df.columns:
@@ -732,7 +702,6 @@ elif menu == "➕ Tambah / Edit Data":
               list_status_fix,
               index=default_idx_status,
               label_visibility="collapsed",
-              key="edit_status"
           )
 
           st.markdown("---")
