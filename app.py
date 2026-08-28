@@ -37,7 +37,7 @@ if data is not None:
     st.markdown("---")
     st.subheader("🔍 Pilih Kendaraan")
 
-    # 1. Pilih Merek Mobil (Otomatis ada fitur ketik/search di HP)
+    # 1. Pilih Merek Mobil (Bertahap supaya mudah di HP)
     daftar_merek = sorted(data[kolom_merek].dropna().unique())
     merek_pilihan = st.selectbox("Pilih Merek Mobil:", daftar_merek)
 
@@ -48,35 +48,18 @@ if data is not None:
     daftar_model = sorted(data_filtered_merek[kolom_model].dropna().unique())
     model_pilihan = st.selectbox("Pilih Model / Tahun Mobil:", daftar_model)
 
-    # Ambil data spesifik untuk mobil yang dipilih
+    # Ambil data spesifik untuk baris mobil yang dipilih
     row_data = data_filtered_merek[data_filtered_merek[kolom_model] == model_pilihan].iloc[0]
 
     st.markdown("---")
-    st.subheader("📋 Detail Spesifikasi Cover Mobil")
+    st.subheader("📋 Detail Ukuran & Informasi")
 
-    # Kotak hijau info pilihan kendaraan
-    st.success(f"**Kendaraan Dipilih:** {merek_pilihan} - {model_pilihan}")
-
-    # Tampilan detail dibuat dua kolom agar rapi di HP
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if 'Tahun' in row_data and pd.notna(row_data['Tahun']):
-            st.info(f"📅 **Tahun:** {row_data['Tahun']}")
-        if 'Ukuran' in row_data and pd.notna(row_data['Ukuran']):
-            st.warning(f"📏 **Ukuran Cover:** {row_data['Ukuran']}")
-        if 'Status' in row_data and pd.notna(row_data['Status']):
-            st.write(f"📌 **Status:** {row_data['Status']}")
-
-    with col2:
-        panjang = row_data.get('Panjang', '-')
-        lebar = row_data.get('Lebar', '-')
-        tinggi = row_data.get('Tinggi', '-')
-        st.write(f"🚗 **Dimensi (P x L x T):**\n{panjang} x {lebar} x {tinggi}")
-
-    # Catatan khusus jika ada di Excel
-    if 'Catatan' in row_data and pd.notna(row_data['Catatan']):
-        st.markdown(f"**📝 Catatan Tambahan:**\n> {row_data['Catatan']}")
+    # Tampilkan kembali semua kolom secara berurutan ke bawah seperti format lama kamu
+    for col in data.columns:
+        val = row_data[col]
+        if pd.notna(val):
+            # Format khusus agar tampilannya rapi seperti list/kolom data
+            st.markdown(f"**{col}**: {val}")
 
 else:
     st.error("⚠️ File `data_cover.xlsx` tidak ditemukan di dalam folder! Pastikan file Excel-nya ada di sebelah file `app.py`.")
