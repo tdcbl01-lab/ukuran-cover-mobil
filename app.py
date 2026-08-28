@@ -69,8 +69,7 @@ def sync_to_github_background(file_path):
     pass
 
 
-# Fungsi memuat data (Aman & Mengabaikan file temp Windows)
-@st.cache_data(ttl=600, show_spinner=False)
+# Fungsi memuat data langsung dari file fisik (Tanpa Cache yang bikin nyangkut)
 def load_data():
   target_file = EXCEL_FILE
   if target_file.startswith("~$"):
@@ -159,7 +158,6 @@ def dialog_konfirmasi_tambah(data_baru):
         updated_df.to_excel(EXCEL_FILE, index=False)
         sync_to_github_background(EXCEL_FILE)
 
-        st.cache_data.clear()
         st.session_state["notif_sukses"] = (
             f"✅ Data Calya (ID {data_baru['ID']}) berhasil disimpan permanen ke Excel & GitHub!"
         )
@@ -199,7 +197,6 @@ def dialog_konfirmasi_edit(idx_pilih, data_update):
         current_df.to_excel(EXCEL_FILE, index=False)
         sync_to_github_background(EXCEL_FILE)
 
-        st.cache_data.clear()
         st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
         st.rerun()
 
