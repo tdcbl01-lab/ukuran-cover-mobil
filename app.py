@@ -32,7 +32,6 @@ EXCEL_FILE = "data_cover.xlsx"
 def sync_to_github_background(file_path):
   """Fungsi otomatis yang membaca token dari st.secrets untuk sync ke GitHub"""
   try:
-    # Abaikan file temporary Excel
     if "data_cover" not in file_path or os.path.basename(file_path).startswith("~"):
       return
 
@@ -109,8 +108,17 @@ for i in range(1, 5):
     df[f"Foto{i}"] = ""
 
 
-# Fungsi untuk menentukan ID berikutnya secara otomatis
+# Fungsi untuk menentukan ID berikutnya secara otomatis berdasarkan data fisik terbaru
 def get_next_id():
+  if os.path.exists(EXCEL_FILE):
+    try:
+      df_current = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+      if not df_current.empty and "ID" in df_current.columns:
+        valid_ids = pd.to_numeric(df_current["ID"], errors="coerce").dropna()
+        if not valid_ids.empty:
+          return int(valid_ids.max()) + 1
+    except Exception:
+      pass
   if not df.empty and "ID" in df.columns:
     try:
       valid_ids = pd.to_numeric(df["ID"], errors="coerce").dropna()
@@ -547,19 +555,31 @@ elif menu == "➕ Tambah / Edit Data":
           "Tahun", placeholder="Contoh: 2016-On", label_visibility="collapsed"
       )
 
+      # Validasi live presisi menggunakan data terbaru dari Excel fisik
       if input_model.strip() != "":
-        cek_live = df[
-            (df["Merek"].str.strip().str.lower() == str(input_merek).strip().lower())
-            & (df["Model"].str.strip().str.lower() == str(input_model).strip().lower())
+        df_live_check = (
+            pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+            if os.path.exists(EXCEL_FILE)
+            else df
+        )
+        cek_live = df_live_check[
+            (
+                df_live_check["Merek"].str.strip().str.lower()
+                == str(input_merek).strip().lower()
+            )
+            & (
+                df_live_check["Model"].str.strip().str.lower()
+                == str(input_model).strip().lower()
+            )
             & (
                 (
-                    df["Tahun"].str.strip().str.lower()
+                    df_live_check["Tahun"].str.strip().str.lower()
                     == str(input_tahun).strip().lower()
                 )
                 if input_tahun.strip() != ""
                 else True
             )
-            & (df["ID"].astype(str).str.strip() != "")
+            & (df_live_check["ID"].astype(str).str.strip() != "")
         ]
 
         if not cek_live.empty:
@@ -615,18 +635,29 @@ elif menu == "➕ Tambah / Edit Data":
           )
 
         if st.form_submit_button("Simpan Data Baru"):
-          duplikat_cek = df[
-              (df["Merek"].str.strip().str.lower() == str(input_merek).strip().lower())
-              & (df["Model"].str.strip().str.lower() == str(input_model).strip().lower())
+          df_submit_check = (
+              pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+              if os.path.exists(EXCEL_FILE)
+              else df
+          )
+          duplikat_cek = df_submit_check[
+              (
+                  df_submit_check["Merek"].str.strip().str.lower()
+                  == str(input_merek).strip().lower()
+              )
+              & (
+                  df_submit_check["Model"].str.strip().str.lower()
+                  == str(input_model).strip().lower()
+              )
               & (
                   (
-                      df["Tahun"].str.strip().str.lower()
+                      df_submit_check["Tahun"].str.strip().str.lower()
                       == str(input_tahun).strip().lower()
                   )
                   if input_tahun.strip() != ""
                   else True
               )
-              & (df["ID"].astype(str).str.strip() != "")
+              & (df_submit_check["ID"].astype(str).str.strip() != "")
           ]
 
           if any(not str(baru.get(k)).strip() for k in kolom_wajib):
