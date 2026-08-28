@@ -17,12 +17,13 @@ FOTO_FOLDER = os.path.join(BASE_DIR, "foto_cover")
 if not os.path.exists(FOTO_FOLDER):
   os.makedirs(FOTO_FOLDER)
 
-# CSS dasar untuk tabel
+# CSS untuk merapikan elemen selectbox bawaan Streamlit agar tidak ada bayangan input ganda
 st.markdown(
     """
     <style>
         [data-testid="stDataFrame"] { width: 100% !important; }
         .stDataFrame table { width: 100% !important; }
+        div[data-baseweb="select"] > div { background-color: #f8f9fa; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -303,19 +304,19 @@ if menu == "🔍 Cari Ukuran Cover":
     if not daftar_merek:
       st.warning("Data belum tersedia.")
     else:
-      merek_pilihan = st.selectbox("Pilih Merek:", daftar_merek)
+      merek_pilihan = st.selectbox("Pilih Merek:", daftar_merek, key="cari_merek")
       df_merk = df[df["Merek"] == merek_pilihan]
 
       daftar_model = sorted(
           [m for m in df_merk["Model"].dropna().unique() if m != ""]
       )
-      model_pilihan = st.selectbox("Pilih Model:", daftar_model)
+      model_pilihan = st.selectbox("Pilih Model:", daftar_model, key="cari_model")
       df_model = df_merk[df_merk["Model"] == model_pilihan]
 
       daftar_tahun = sorted(
           [t for t in df_model["Tahun"].dropna().unique() if t != ""]
       )
-      tahun_pilihan = st.selectbox("Pilih Tahun:", daftar_tahun)
+      tahun_pilihan = st.selectbox("Pilih Tahun:", daftar_tahun, key="cari_tahun")
 
       hasil = df_model[
           (df_model["Tahun"] == tahun_pilihan)
@@ -353,7 +354,7 @@ elif menu == "📊 Filter Berdasarkan Ukuran":
     if not daftar_ukuran:
       st.warning("Data ukuran belum tersedia.")
     else:
-      ukuran_pilihan = st.selectbox("Pilih Ukuran Cover:", daftar_ukuran)
+      ukuran_pilihan = st.selectbox("Pilih Ukuran Cover:", daftar_ukuran, key="filter_ukuran")
       df_filter_ukuran = df[
           (df["Ukuran"] == ukuran_pilihan)
           & (df["ID"].astype(str).str.strip() != "")
@@ -476,11 +477,11 @@ elif menu == "➕ Tambah / Edit Data":
     ]
     kolom_foto_list = ["Foto1", "Foto2", "Foto3", "Foto4"]
 
-    list_merek_excel = sorted([
-        str(m)
+    list_merek_excel = sorted(list(set([
+        str(m).strip()
         for m in df["Merek"].dropna().unique()
         if str(m).strip() != "" and str(m).lower() != "nan"
-    ])
+    ])))
     if not list_merek_excel:
       list_merek_excel = ["Toyota", "Honda", "Daihatsu", "Suzuki"]
 
@@ -511,6 +512,7 @@ elif menu == "➕ Tambah / Edit Data":
           list_merek_excel,
           index=0,
           label_visibility="collapsed",
+          key="tambah_merek_pilihan"
       )
 
       st.markdown(
@@ -550,7 +552,7 @@ elif menu == "➕ Tambah / Edit Data":
 
         st.markdown("Status <span style='color:red;'>*</span>", unsafe_allow_html=True)
         baru["Status"] = st.selectbox(
-            "Status", list_status_fix, label_visibility="collapsed"
+            "Status", list_status_fix, label_visibility="collapsed", key="tambah_status"
         )
 
         st.markdown("---")
@@ -635,7 +637,7 @@ elif menu == "➕ Tambah / Edit Data":
             + df_aktif["Model"]
         )
         idx_str = st.selectbox(
-            "Pilih Data:", df_aktif["Pilihan_Edit"].unique()
+            "Pilih Data:", df_aktif["Pilihan_Edit"].unique(), key="pilih_data_edit"
         )
         idx_pilih = int(idx_str.split(" - ")[0])
 
@@ -673,6 +675,7 @@ elif menu == "➕ Tambah / Edit Data":
               list_merek_excel,
               index=default_idx_merek,
               label_visibility="collapsed",
+              key="edit_merek_pilihan"
           )
 
           for col in df.columns:
@@ -718,6 +721,7 @@ elif menu == "➕ Tambah / Edit Data":
               list_status_fix,
               index=default_idx_status,
               label_visibility="collapsed",
+              key="edit_status"
           )
 
           st.markdown("---")
