@@ -30,8 +30,7 @@ if data is not None:
     # Bersihkan nama kolom dari spasi berlebih jika ada
     data.columns = data.columns.str.strip()
     
-    # Pastikan kolom yang dibutuhkan ada di Excel
-    # Sesuaikan 'Merek' dan 'Model' dengan nama kolom asli di Excel kamu kalau berbeda
+    # Deteksi nama kolom Merek dan Model
     kolom_merek = 'Merek' if 'Merek' in data.columns else data.columns[0]
     kolom_model = 'Model' if 'Model' in data.columns else data.columns[1]
 
@@ -53,20 +52,31 @@ if data is not None:
     row_data = data_filtered_merek[data_filtered_merek[kolom_model] == model_pilihan].iloc[0]
 
     st.markdown("---")
-    st.subheader("📋 Detail Ukuran & Informasi")
+    st.subheader("📋 Detail Spesifikasi Cover Mobil")
 
-    # Tampilkan informasi detail (sesuaikan kolom lain sesuai isi Excel kamu)
-    st.success(f"**Pilihan Kamu:** {merek_pilihan} - {model_pilihan}")
+    # Kotak hijau info pilihan kendaraan
+    st.success(f"**Kendaraan Dipilih:** {merek_pilihan} - {model_pilihan}")
 
-    # Menampilkan sisa kolom yang ada di excel secara otomatis
-    for col in data.columns:
-        if col not in [kolom_merek, kolom_model]:
-            val = row_data[col]
-            if pd.notna(val):
-                st.write(f"**{col}:** {val}")
-
-    # Contoh menampilkan gambar jika ada kolom foto atau folder foto_cover
-    # (Opsional, bagian ini bisa disesuaikan dengan struktur foto kamu)
+    # Tampilan detail dibuat dua kolom agar rapi di HP
+    col1, col2 = st.columns(2)
     
+    with col1:
+        if 'Tahun' in row_data and pd.notna(row_data['Tahun']):
+            st.info(f"📅 **Tahun:** {row_data['Tahun']}")
+        if 'Ukuran' in row_data and pd.notna(row_data['Ukuran']):
+            st.warning(f"📏 **Ukuran Cover:** {row_data['Ukuran']}")
+        if 'Status' in row_data and pd.notna(row_data['Status']):
+            st.write(f"📌 **Status:** {row_data['Status']}")
+
+    with col2:
+        panjang = row_data.get('Panjang', '-')
+        lebar = row_data.get('Lebar', '-')
+        tinggi = row_data.get('Tinggi', '-')
+        st.write(f"🚗 **Dimensi (P x L x T):**\n{panjang} x {lebar} x {tinggi}")
+
+    # Catatan khusus jika ada di Excel
+    if 'Catatan' in row_data and pd.notna(row_data['Catatan']):
+        st.markdown(f"**📝 Catatan Tambahan:**\n> {row_data['Catatan']}")
+
 else:
-    st.error("⚠️ File `data_cover.xlsx` tidak ditemukan di dalam folder! Pastikan file Excel-nya sudah ada di sebelah file `app.py`.")
+    st.error("⚠️ File `data_cover.xlsx` tidak ditemukan di dalam folder! Pastikan file Excel-nya ada di sebelah file `app.py`.")
