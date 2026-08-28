@@ -28,21 +28,26 @@ st.markdown(
 EXCEL_FILE = "data_cover.xlsx"
 
 
-# --- FUNGSI INTEGRASI GITHUB ---
-def sync_to_github_background(file_path):
+# --- FUNGSI SIMPAN UTAMA LANGSUNG KE GITHUB (ANTI HILANG) ---
+def save_to_github_directly(df_target, file_path, commit_message):
   try:
-    if "github" in st.secrets and os.path.exists(file_path):
+    if "github" in st.secrets:
       gh = st.secrets["github"]
       token = gh.get("token")
       repo = gh.get("repo")
       branch = gh.get("branch", "main")
 
       if token and repo:
+        # Simpan lokal terlebih dahulu untuk dibaca bytes-nya
+        df_target.to_excel(file_path, index=False)
+        
         url = f"https://api.github.com/repos/{repo}/contents/{file_path}"
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
         }
+        
+        # Ambil SHA terbaru agar tidak terjadi konflik commit di GitHub
         sha = None
         r_get = requests.get(url, headers=headers)
         if r_get.status_code == 200:
@@ -53,15 +58,20 @@ def sync_to_github_background(file_path):
         content_encoded = base64.b64encode(content_bytes).decode("utf-8")
 
         payload = {
-            "message": f"Auto-sync data_cover.xlsx via Streamlit {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            "message": commit_message,
             "content": content_encoded,
             "branch": branch,
         }
         if sha:
           payload["sha"] = sha
-        requests.put(url, json=payload, headers=headers)
-  except Exception:
-    pass
+          
+        r_put = requests.put(url, json=payload, headers=headers)
+        if r_put.status_code in [200, 201]:
+          return True
+    return False
+  except Exception as e:
+    st.error(f"Gagal koneksi ke GitHub: {e}")
+    return False
 
 
 # Fungsi memuat data stabil dengan cache
@@ -353,13 +363,15 @@ elif menu == "➕ Tambah / Edit Data":
           df_baru_item = pd.DataFrame([baru_data])
           df_final = pd.concat([df_fisik, df_baru_item], ignore_index=True)
           
-          df_final.to_excel(EXCEL_FILE, index=False)
+          # SIMPAN LANGSUNG KE GITHUB
+          sukses_github = save_to_github_directly(df_final, EXCEL_FILE, f"Tambah data ID {next_id} via Streamlit")
           
-          sync_to_github_background(EXCEL_FILE)
-          st.cache_data.clear()
-
-          st.session_state["notif_sukses"] = "🎉 BERHASIL! Data sudah tertulis permanen ke file Excel."
-          st.rerun()
+          if sukses_github:
+            st.cache_data.clear()
+            st.session_state["notif_sukses"] = "🎉 BERHASIL! Data tersimpan permanen ke GitHub & file Excel."
+            st.rerun()
+          else:
+            st.error("❌ Gagal menyimpan ke GitHub! Pastikan pengaturan secrets GitHub di Streamlit sudah benar.")
 
     else:
       df_aktif = df[df["ID"].astype(str).str.strip() != ""]
@@ -452,10 +464,12 @@ elif menu == "➕ Tambah / Edit Data":
               if k in df_fisik.columns and idx_pilih < len(df_fisik):
                 df_fisik.loc[idx_pilih, k] = v
 
-            df_fisik.to_excel(EXCEL_FILE, index=False)
+            # SIMPAN PERUBAHAN LANGSUNG KE GITHUB
+            sukses_github = save_to_github_directly(df_fisik, EXCEL_FILE, f"Edit data index {idx_pilih} via Streamlit")
 
-            sync_to_github_background(EXCEL_FILE)
-            st.cache_data.clear()
-
-            st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui dan tersimpan permanen ke Excel!"
-            st.rerun()
+            if sukses_github:
+              st.cache_data.clear()
+              st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui dan tersimpan permanen ke GitHub & Excel!"
+              st.rerun()
+            else:
+              st.error("❌ Gagal memperbarui ke GitHub! Pastikan token secrets aktif.")
