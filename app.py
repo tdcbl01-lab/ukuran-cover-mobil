@@ -17,16 +17,23 @@ FOTO_FOLDER = os.path.join(BASE_DIR, "foto_cover")
 if not os.path.exists(FOTO_FOLDER):
   os.makedirs(FOTO_FOLDER)
 
-# CSS Total untuk merapikan tabel dan membuang kotak input ganda / combobox Streamlit versi baru
+# CSS Total untuk merapikan tabel & menghilangkan kotak input bayangan selectbox versi baru
 st.markdown(
     """
     <style>
         [data-testid="stDataFrame"] { width: 100% !important; }
         .stDataFrame table { width: 100% !important; }
         div[data-baseweb="select"] > div { background-color: #f8f9fa; }
-        /* Membuang kotak input text bayangan di dalam selectbox versi baru */
-        div[data-baseweb="select"] input {
-            display: none !important;
+        
+        /* Membuang kotak input teks/combobox bayangan bawaan Streamlit versi baru */
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+            clip: rect(1px, 1px, 1px, 1px) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
         }
     </style>
 """,
