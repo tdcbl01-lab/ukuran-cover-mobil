@@ -9,8 +9,8 @@ import streamlit as st
 # Konfigurasi halaman (Harus paling atas)
 st.set_page_config(page_title="Aplikasi Cover Mobil TDC")
 
-# Folder penyimpanan foto di direktori aktif lokal
-BASE_DIR = os.getcwd()
+# Folder penyimpanan dikunci mutlak ke direktori lokal Documents\GitHub\ukuran-cover-mobil
+BASE_DIR = os.path.join(os.path.expanduser("~"), "Documents", "GitHub", "ukuran-cover-mobil")
 EXCEL_FILE = os.path.join(BASE_DIR, "data_cover.xlsx")
 FOTO_FOLDER = os.path.join(BASE_DIR, "foto_cover")
 
@@ -156,9 +156,7 @@ def dialog_konfirmasi_tambah(data_baru):
         updated_df.to_excel(EXCEL_FILE, index=False)
         sync_to_github_background(EXCEL_FILE)
 
-        st.session_state["notif_sukses"] = (
-            f"✅ Data ID {data_baru['ID']} berhasil disimpan ke file Excel lokal!"
-        )
+        st.session_state["notif_sukses"] = f"✅ Data ID {data_baru['ID']} berhasil disimpan ke: {EXCEL_FILE}"
         st.rerun()
 
       except Exception as e:
@@ -190,7 +188,7 @@ def dialog_konfirmasi_edit(idx_pilih, data_update):
         current_df.to_excel(EXCEL_FILE, index=False)
         sync_to_github_background(EXCEL_FILE)
 
-        st.session_state["notif_sukses"] = "✏️ Data berhasil diperbarui!"
+        st.session_state["notif_sukses"] = f"✏️ Data berhasil diperbarui di: {EXCEL_FILE}"
         st.rerun()
 
       except Exception as e:
