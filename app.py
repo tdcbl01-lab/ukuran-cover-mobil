@@ -503,9 +503,7 @@ elif menu == "➕ Tambah / Edit Data":
       )
 
       st.markdown(
-          "Merek <span style='color:red;'>*</span> <span style='font-size:"
-          " 11px; color: gray;'>(Pilih dari daftar atau ketik langsung merek"
-          " baru)</span>",
+          "Merek <span style='color:red;'>*</span>",
           unsafe_allow_html=True,
       )
       input_merek = st.selectbox(
@@ -513,7 +511,6 @@ elif menu == "➕ Tambah / Edit Data":
           list_merek_excel,
           index=0,
           label_visibility="collapsed",
-          accept_new_options=True,
       )
 
       st.markdown(
@@ -676,7 +673,6 @@ elif menu == "➕ Tambah / Edit Data":
               list_merek_excel,
               index=default_idx_merek,
               label_visibility="collapsed",
-              accept_new_options=True,
           )
 
           for col in df.columns:
