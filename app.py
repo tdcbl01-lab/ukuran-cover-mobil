@@ -52,14 +52,33 @@ if data is not None:
     row_data = data_filtered_merek[data_filtered_merek[kolom_model] == model_pilihan].iloc[0]
 
     st.markdown("---")
-    st.subheader("📋 Detail Ukuran & Informasi")
+    st.subheader("📋 Detail Spesifikasi Cover Mobil")
 
-    # Tampilkan kembali semua kolom secara berurutan ke bawah seperti format lama kamu
-    for col in data.columns:
-        val = row_data[col]
-        if pd.notna(val):
-            # Format khusus agar tampilannya rapi seperti list/kolom data
-            st.markdown(f"**{col}**: {val}")
+    # Kotak hijau info pilihan kendaraan
+    st.success(f"**Kendaraan Dipilih:** {merek_pilihan} - {model_pilihan}")
+
+    # Tampilan kotak-kotak rapi per informasi penting
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if 'Tahun' in row_data and pd.notna(row_data['Tahun']):
+            st.info(f"📅 **Tahun:** {row_data['Tahun']}")
+        if 'Ukuran' in row_data and pd.notna(row_data['Ukuran']):
+            st.warning(f"📏 **Ukuran Cover:** {row_data['Ukuran']}")
+
+    with col2:
+        if 'Status' in row_data and pd.notna(row_data['Status']):
+            st.error(f"📌 **Status:** {row_data['Status']}")
+
+    # Dimensi lengkap
+    panjang = row_data.get('Panjang', '-')
+    lebar = row_data.get('Lebar', '-')
+    tinggi = row_data.get('Tinggi', '-')
+    st.markdown(f"**🚗 Dimensi (P x L x T):** {panjang} x {lebar} x {tinggi}")
+
+    # Catatan khusus jika ada di Excel
+    if 'Catatan' in row_data and pd.notna(row_data['Catatan']):
+        st.markdown(f"**📝 Catatan Tambahan:**\n> {row_data['Catatan']}")
 
 else:
     st.error("⚠️ File `data_cover.xlsx` tidak ditemukan di dalam folder! Pastikan file Excel-nya ada di sebelah file `app.py`.")
