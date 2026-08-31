@@ -126,7 +126,6 @@ def load_data(file_mtime):
         return df_dummy
 
 
-# Cek waktu modifikasi file Excel secara real-time agar sinkron otomatis saat ada update / fetch
 file_mtime = os.path.getmtime(EXCEL_FILE) if os.path.exists(EXCEL_FILE) else 0
 
 df = load_data(file_mtime)
@@ -165,7 +164,6 @@ def highlight_cols(x):
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-# Inisialisasi state pop-up
 if "show_popup" not in st.session_state:
     st.session_state["show_popup"] = None
 if "popup_msg" not in st.session_state:
@@ -335,7 +333,6 @@ elif menu == "➕ Tambah / Edit Data":
             )
         st.markdown("---")
 
-        # --- TAMPILAN POP-UP MODAL MENGGUNAKAN ST.DIALOG ---
         if st.session_state["show_popup"] is not None:
             p_type = st.session_state["popup_type"]
             p_title = st.session_state["popup_title"]
@@ -376,16 +373,36 @@ elif menu == "➕ Tambah / Edit Data":
         if mode_kelola == "➕ Tambah Data Baru":
             next_id = get_next_id()
 
-            list_merek_tambah = sorted(list(set([str(m).strip() for m in df["Merek"].dropna().unique() if str(m).strip() != "" and str(m).lower() != "nan"])))
-            if not list_merek_tambah:
-                list_merek_tambah = ["Toyota", "Honda", "Daihatsu", "Suzuki"]
-
             st.markdown("Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.", unsafe_allow_html=True)
             st.markdown("ID <span style='color:gray;'>(Otomatis)</span>", unsafe_allow_html=True)
             st.text_input("ID Display", value=str(next_id), disabled=True, label_visibility="collapsed")
 
+            # --- MEREK PILIHAN DENGAN MENGABUNGKAN VERSI HURUF KECIL KE OPSI SUPAYA "Add:" HILANG ---
+            base_merek_list = sorted([m for m in df["Merek"].dropna().unique() if str(m).strip() != ""])
+            extended_merek_set = set(base_merek_list)
+            for m in base_merek_list:
+                extended_merek_set.add(m.lower())
+                extended_merek_set.add(m.upper())
+            existing_merek_list = sorted(list(extended_merek_set))
+            
             st.markdown("Merek <span style='color:red;'>*</span>", unsafe_allow_html=True)
-            input_merek = st.selectbox("Merek Input", list_merek_tambah, index=0, label_visibility="collapsed")
+            selected_merek_raw = st.selectbox(
+                "Merek Input", 
+                options=[""] + existing_merek_list, 
+                accept_new_options=True, 
+                label_visibility="collapsed", 
+                key="add_merek_selectbox"
+            )
+
+            input_merek = str(selected_merek_raw).strip()
+            if input_merek.lower().startswith("add:"):
+                input_merek = input_merek[4:].strip()
+            
+            # Normalisasi otomatis ke format standar yang sudah ada di database jika cocok secara case-insensitive
+            matching_existing = [m for m in base_merek_list if m.lower() == input_merek.lower()]
+            if matching_existing:
+                input_merek = matching_existing[0]
+            # -------------------------------------------------------------------------------------------------------------------
 
             st.markdown("Model <span style='color:red;'>*</span>", unsafe_allow_html=True)
             input_model = st.text_input("Model Input", placeholder="Contoh: Avanza", label_visibility="collapsed")
@@ -419,7 +436,7 @@ elif menu == "➕ Tambah / Edit Data":
 
             if st.button("💾 Simpan Data ke Excel", type="primary"):
                 if not str(input_merek).strip() or not str(input_model).strip() or not str(input_tahun).strip():
-                    st.error("❌ Gagal! Merek, Model, dan Tahun wajib diisi!")
+                    st.error("❌ Gagal! Merek, Model, dan Tahun wajib diisi dengan benar!")
                 else:
                     if os.path.exists(EXCEL_FILE):
                         df_cek_duplikat = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
@@ -506,39 +523,57 @@ elif menu == "➕ Tambah / Edit Data":
                 val_tahun_asli = str(df.loc[idx_pilih, "Tahun"]) if "Tahun" in df.columns else ""
                 val_status_asli = str(df.loc[idx_pilih, "Status"]) if "Status" in df.columns else "STANDAR"
 
-                list_merek_edit = sorted(list(set([str(m).strip() for m in df["Merek"].dropna().unique() if str(m).strip() != "" and str(m).lower() != "nan"])))
-                if not list_merek_edit:
-                    list_merek_edit = ["Toyota", "Honda", "Daihatsu", "Suzuki"]
-                
-                if val_merek_asli in list_merek_edit:
-                    list_merek_edit.remove(val_merek_asli)
-                list_merek_edit.insert(0, val_merek_asli)
-
                 st.markdown("Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.", unsafe_allow_html=True)
 
                 widget_values = {}
 
+                # --- MEREK EDIT AMAN DENGAN EKSTENSI OPSI HURUF KECIL/BESAR ---
+                base_merek_list = sorted([m for m in df["Merek"].dropna().unique() if str(m).strip() != ""])
+                extended_merek_set = set(base_merek_list)
+                for m in base_merek_list:
+                    extended_merek_set.add(m.lower())
+                    extended_merek_set.add(m.upper())
+                existing_merek_list = sorted(list(extended_merek_set))
+                
+                default_merek_idx = existing_merek_list.index(val_merek_asli) if val_merek_asli in existing_merek_list else 0
+
                 st.markdown("Merek <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                selected_merek = st.selectbox("Merek Edit", list_merek_edit, index=0, label_visibility="collapsed", key=f"edit_merek_{idx_pilih}")
+                selected_merek_edit_raw = st.selectbox(
+                    "Merek Edit Selectbox", 
+                    options=existing_merek_list, 
+                    index=default_merek_idx, 
+                    accept_new_options=True, 
+                    label_visibility="collapsed", 
+                    key=f"edit_merek_choice_{idx_pilih}"
+                )
+
+                selected_merek = str(selected_merek_edit_raw).strip()
+                if selected_merek.lower().startswith("add:"):
+                    selected_merek = selected_merek[4:].strip()
+
+                matching_existing_edit = [m for m in base_merek_list if m.lower() == selected_merek.lower()]
+                if matching_existing_edit:
+                    selected_merek = matching_existing_edit[0]
+
                 widget_values["Merek"] = selected_merek
 
-                daftar_model_berdasarkan_merek = sorted(list(set([str(m).strip() for m in df[df["Merek"] == selected_merek]["Model"].dropna().unique() if str(m).strip() != ""])))
+                daftar_model_berdasarkan_merek = sorted(list(set([str(m).strip() for m in df[df["Merek"].str.strip().str.lower() == selected_merek.strip().lower()]["Model"].dropna().unique() if str(m).strip() != ""])))
                 
                 st.markdown("Model <span style='color:red;'>*</span>", unsafe_allow_html=True)
                 if daftar_model_berdasarkan_merek:
-                    if val_model_asli not in daftar_model_berdasarkan_merek and selected_merek == val_merek_asli:
+                    if val_model_asli not in daftar_model_berdasarkan_merek and selected_merek.strip().lower() == val_merek_asli.strip().lower():
                         daftar_model_berdasarkan_merek.insert(0, val_model_asli)
                     
-                    default_model_idx = daftar_model_berdasarkan_merek.index(val_model_asli) if (selected_merek == val_merek_asli and val_model_asli in daftar_model_berdasarkan_merek) else 0
+                    default_model_idx = daftar_model_berdasarkan_merek.index(val_model_asli) if (selected_merek.strip().lower() == val_merek_asli.strip().lower() and val_model_asli in daftar_model_berdasarkan_merek) else 0
                     
                     selected_model = st.selectbox("Model Edit Select", daftar_model_berdasarkan_merek, index=default_model_idx, label_visibility="collapsed", key=f"edit_model_sel_{idx_pilih}")
                 else:
-                    initial_model_val = val_model_asli if selected_merek == val_merek_asli else ""
+                    initial_model_val = val_model_asli if selected_merek.strip().lower() == val_merek_asli.strip().lower() else ""
                     selected_model = st.text_input("Model Edit Text", value=initial_model_val, placeholder="Contoh: J7, E5", label_visibility="collapsed", key=f"edit_model_txt_{idx_pilih}")
                 
                 widget_values["Model"] = selected_model
 
-                df_ref_matched = df[(df["Merek"].str.strip() == selected_merek.strip()) & (df["Model"].str.strip() == selected_model.strip())]
+                df_ref_matched = df[(df["Merek"].str.strip().str.lower() == selected_merek.strip().lower()) & (df["Model"].str.strip().str.lower() == selected_model.strip().lower())]
                 if not df_ref_matched.empty:
                     row_ref = df_ref_matched.iloc[-1]
                 else:
@@ -597,7 +632,6 @@ elif menu == "➕ Tambah / Edit Data":
                 with col_btn_center2:
                     tombol_simpan_edit = st.button("💾 Update / Simpan Perubahan", type="primary", key=f"btn_save_{idx_pilih}")
 
-                # --- BLOK VALIDASI & EKSEKUSI TOMBOL SIMPAN ---
                 if tombol_simpan_edit:
                     ada_perubahan_data = False
                     for k, v in widget_values.items():
@@ -623,7 +657,7 @@ elif menu == "➕ Tambah / Edit Data":
                         st.session_state["show_popup"] = "aktif"
                         st.rerun()
                     elif any(not str(widget_values.get(k)).strip() for k in ["Merek", "Model", "Tahun", "Status"]):
-                        st.error("❌ Gagal! Kolom wajib (Merek, Model, Tahun, Status) harus diisi!")
+                        st.error("❌ Gagal! Kolom wajib (Merek, Model, Tahun, Status) harus diisi dengan benar!")
                     else:
                         if os.path.exists(EXCEL_FILE):
                             df_fisik = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
@@ -636,3 +670,30 @@ elif menu == "➕ Tambah / Edit Data":
                         catatan_input_user = update.get("Catatan", "")
                         catatan_bersih = re.sub(r"\s*([\|–-]|Terakhir diedit|Diedit tgl|Pernah diedit).*$", "", catatan_input_user).strip()
                         update["Catatan"] = f"{catatan_bersih} | Terakhir diedit: {waktu_sekarang}" if catatan_bersih else f"Terakhir diedit: {waktu_sekarang}"
+
+                        for key_f, up_f in uploaded_files_edit.items():
+                            if up_f is not None:
+                                timestamp_awalan = int(datetime.now().timestamp())
+                                nama_file_foto = f"{timestamp_awalan}_{key_f}_{up_f.name}"
+                                path_simpan = os.path.join(FOTO_FOLDER, nama_file_foto)
+                                with open(path_simpan, "wb") as f:
+                                    f.write(up_f.getbuffer())
+                                update[key_f] = nama_file_foto
+                            else:
+                                update[key_f] = str(df_fisik.loc[idx_pilih, key_f]) if key_f in df_fisik.columns else ""
+
+                        for k, v in update.items():
+                            if k in df_fisik.columns:
+                                df_fisik.loc[idx_pilih, k] = str(v).strip()
+
+                        sukses_simpan, err_msg = save_data_smart(df_fisik, EXCEL_FILE, f"Update data ID {df_fisik.loc[idx_pilih, 'ID']} via Streamlit")
+
+                        if sukses_simpan:
+                            st.cache_data.clear()
+                            st.session_state["popup_title"] = "Berhasil Disimpan!"
+                            st.session_state["popup_msg"] = "Perubahan data berhasil diperbarui dan disimpan secara permanen ke database Excel!"
+                            st.session_state["popup_type"] = "success"
+                            st.session_state["show_popup"] = "aktif"
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Gagal memperbarui data: {err_msg}")
