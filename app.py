@@ -98,9 +98,9 @@ def save_data_smart(df_target, file_path, commit_message):
         return False, str(e)
 
 
-# Fungsi memuat data stabil
-@st.cache_data(ttl=600, show_spinner=False)
-def load_data():
+# --- FUNGSI MEMUAT DATA DENGAN DETEKSI PERUBAHAN FILE OTOMATIS ---
+@st.cache_data(show_spinner=False)
+def load_data(file_mtime):
     if os.path.exists(EXCEL_FILE):
         df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
         if {"Merek", "Model", "Tahun"}.issubset(df.columns):
@@ -126,7 +126,10 @@ def load_data():
         return df_dummy
 
 
-df = load_data()
+# Cek waktu modifikasi file Excel secara real-time agar sinkron otomatis saat ada update / fetch
+file_mtime = os.path.getmtime(EXCEL_FILE) if os.path.exists(EXCEL_FILE) else 0
+
+df = load_data(file_mtime)
 df.columns = df.columns.str.strip()
 for i in range(1, 5):
     if f"Foto{i}" not in df.columns:
@@ -596,7 +599,6 @@ elif menu == "➕ Tambah / Edit Data":
 
                 # --- BLOK VALIDASI & EKSEKUSI TOMBOL SIMPAN ---
                 if tombol_simpan_edit:
-                    # 1. Cek apakah ada perubahan data teks dibandingkan data asli di baris tersebut
                     ada_perubahan_data = False
                     for k, v in widget_values.items():
                         val_lama_db = str(df.loc[idx_pilih, k]) if k in df.columns else ""
@@ -612,10 +614,8 @@ elif menu == "➕ Tambah / Edit Data":
                             ada_perubahan_data = True
                             break
 
-                    # 2. Cek apakah ada upload foto baru
                     ada_foto_baru = any(up_f is not None for up_f in uploaded_files_edit.values())
 
-                    # JIKA TIDAK ADA PERUBAHAN SAMA SEKALI, MUNCULKAN POP-UP PERINGATAN
                     if not ada_perubahan_data and not ada_foto_baru:
                         st.session_state["popup_title"] = "Perhatian"
                         st.session_state["popup_msg"] = "Tidak ada perubahan data atau foto yang dilakukan!<br><br>Silakan ubah data terlebih dahulu jika ingin menyimpan."
@@ -636,39 +636,3 @@ elif menu == "➕ Tambah / Edit Data":
                         catatan_input_user = update.get("Catatan", "")
                         catatan_bersih = re.sub(r"\s*([\|–-]|Terakhir diedit|Diedit tgl|Pernah diedit).*$", "", catatan_input_user).strip()
                         update["Catatan"] = f"{catatan_bersih} | Terakhir diedit: {waktu_sekarang}" if catatan_bersih else f"Terakhir diedit: {waktu_sekarang}"
-
-                        foto_lama = {}
-                        for i in range(1, 5):
-                            k_f = f"Foto{i}"
-                            val_F = str(df.loc[idx_pilih, k_f]) if k_f in df.columns else ""
-                            foto_lama[k_f] = "" if val_F.lower() in ["nan", "none"] else val_F
-
-                        timestamp_awalan = int(datetime.now().timestamp())
-                        for key_f, up_f in uploaded_files_edit.items():
-                            if up_f is not None:
-                                nama_file_foto = f"{timestamp_awalan}_{key_f}_{up_f.name}"
-                                path_simpan = os.path.join(FOTO_FOLDER, nama_file_foto)
-                                with open(path_simpan, "wb") as f:
-                                    f.write(up_f.getbuffer())
-                                update[key_f] = nama_file_foto
-                            else:
-                                update[key_f] = foto_lama.get(key_f, "")
-
-                        for col_k, col_v in update.items():
-                            df_fisik.loc[idx_pilih, col_k] = col_v
-
-                        sukses_update, err_msg = save_data_smart(df_fisik, EXCEL_FILE, f"Update data ID {df.loc[idx_pilih, 'ID']} via Streamlit")
-
-                        if sukses_update:
-                            st.cache_data.clear()
-                            st.session_state["popup_title"] = "Berhasil!"
-                            st.session_state["popup_msg"] = "Perubahan data berhasil disimpan secara permanen ke database Excel!"
-                            st.session_state["popup_type"] = "success"
-                            st.session_state["show_popup"] = "aktif"
-                            st.rerun()
-                        else:
-                            st.session_state["popup_title"] = "Gagal Menyimpan Perubahan"
-                            st.session_state["popup_msg"] = f"Terjadi kesalahan saat menyimpan perubahan:<br><br><code>{err_msg}</code>"
-                            st.session_state["popup_type"] = "error"
-                            st.session_state["show_popup"] = "aktif"
-                            st.rerun()
