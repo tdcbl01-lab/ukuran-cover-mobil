@@ -116,33 +116,30 @@ def save_data_smart(df_target, file_path, commit_message):
 # --- FUNGSI MEMUAT DATA DARI GOOGLE SHEETS & FALLBACK LOKAL ---
 @st.cache_data(show_spinner=False)
 def load_data():
+    df = pd.DataFrame()
     try:
         url_csv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
         df = pd.read_csv(url_csv, dtype=str, keep_default_na=False)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-            if {"Merek", "Model", "Tahun"}.issubset(df.columns):
-                df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
-                df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
-                df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
-                df = df[df["_m"] != ""]
-                df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
-                df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
-                df = df.reset_index(drop=True)
-                if "ID" in df.columns:
-                    df["ID"] = (df.index + 1).astype(str)
-            for i in range(1, 5):
-                col_name = f"Foto{i}"
-                if col_name not in df.columns:
-                    df[col_name] = ""
-            return df
     except Exception:
         pass
 
-    # Fallback ke file Excel lokal jika Google Sheets gagal dimuat
-    if os.path.exists(EXCEL_FILE):
-        df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+    if df.empty and os.path.exists(EXCEL_FILE):
+        try:
+            df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+        except Exception:
+            pass
+
+    if not df.empty:
         df.columns = df.columns.str.strip()
+        if {"Merek", "Model", "Tahun"}.issubset(df.columns):
+            df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
+            df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
+            df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
+            df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
+            df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
+            df = df.reset_index(drop=True)
+            if "ID" in df.columns:
+                df["ID"] = (df.index + 1).astype(str)
         for i in range(1, 5):
             col_name = f"Foto{i}"
             if col_name not in df.columns:
@@ -229,6 +226,14 @@ with col_tagline:
     """,
         unsafe_allow_html=True,
     )
+
+# Tombol Clear Cache di Sidebar agar mudah menyegarkan data
+with st.sidebar:
+    st.markdown("### Pengaturan Sistem")
+    if st.button("🔄 Muat Ulang / Refresh Data"):
+        st.cache_data.clear()
+        st.success("Cache berhasil dibersihkan!")
+        st.rerun()
 
 st.markdown(
     "<hr style='margin-top: 10px; margin-bottom: 10px;'>", unsafe_allow_html=True
@@ -836,30 +841,48 @@ elif menu == "➕ Tambah / Edit Data":
                 )
                 idx_pilih = int(idx_str.split(" - ")[0])
 
-                val_merek_asli = df.loc[idx_pilih, "Merek"]
-                val_model_asli = df.loc[idx_pilih, "Model"]
-                val_tahun_asli = df.loc[idx_pilih, "Tahun"]
+                val_merek_asli = (
+                    str(df.loc[idx_pilih, "Merek"])
+                    if "Merek" in df.columns
+                    else ""
+                )
+                val_model_asli = (
+                    str(df.loc[idx_pilih, "Model"])
+                    if "Model" in df.columns
+                    else ""
+                )
+                val_tahun_asli = (
+                    str(df.loc[idx_pilih, "Tahun"])
+                    if "Tahun" in df.columns
+                    else ""
+                )
                 val_ukuran_asli = (
-                    df.loc[idx_pilih, "Ukuran"] if "Ukuran" in df.columns else ""
+                    str(df.loc[idx_pilih, "Ukuran"])
+                    if "Ukuran" in df.columns
+                    else ""
                 )
                 val_panjang_asli = (
-                    df.loc[idx_pilih, "Panjang"]
+                    str(df.loc[idx_pilih, "Panjang"])
                     if "Panjang" in df.columns
                     else ""
                 )
                 val_lebar_asli = (
-                    df.loc[idx_pilih, "Lebar"] if "Lebar" in df.columns else ""
+                    str(df.loc[idx_pilih, "Lebar"])
+                    if "Lebar" in df.columns
+                    else ""
                 )
                 val_tinggi_asli = (
-                    df.loc[idx_pilih, "Tinggi"] if "Tinggi" in df.columns else ""
+                    str(df.loc[idx_pilih, "Tinggi"])
+                    if "Tinggi" in df.columns
+                    else ""
                 )
                 val_status_asli = (
-                    df.loc[idx_pilih, "Status"]
+                    str(df.loc[idx_pilih, "Status"])
                     if "Status" in df.columns
                     else "STANDAR"
                 )
                 val_catatan_asli = (
-                    df.loc[idx_pilih, "Catatan"]
+                    str(df.loc[idx_pilih, "Catatan"])
                     if "Catatan" in df.columns
                     else ""
                 )
@@ -867,8 +890,102 @@ elif menu == "➕ Tambah / Edit Data":
                 st.markdown("---")
                 st.markdown(f"**Edit Data [ID: {df.loc[idx_pilih, 'ID']}]**")
 
-                edit_merek = st.text_input("Merek", value=val_merek_asli)
-                edit_model = st.text_input("Model", value=val_model_asli)
+                # --- DROPDOWN MEREK DENGAN OPSI CERDAS ---
+                base_merek_list = sorted(
+                    [
+                        m
+                        for m in df["Merek"].dropna().unique()
+                        if str(m).strip() != ""
+                    ]
+                )
+                extended_merek_set = set(base_merek_list)
+                for m in base_merek_list:
+                    extended_merek_set.add(m.lower())
+                    extended_merek_set.add(m.upper())
+                existing_merek_list = sorted(list(extended_merek_set))
+
+                default_merek_idx = (
+                    existing_merek_list.index(val_merek_asli)
+                    if val_merek_asli in existing_merek_list
+                    else 0
+                )
+
+                st.markdown(
+                    "Merek <span style='color:red;'>*</span>",
+                    unsafe_allow_html=True,
+                )
+                selected_merek_edit_raw = st.selectbox(
+                    "Merek Edit Selectbox",
+                    options=existing_merek_list,
+                    index=default_merek_idx,
+                    accept_new_options=True,
+                    label_visibility="collapsed",
+                    key=f"edit_merek_choice_{idx_pilih}",
+                )
+
+                edit_merek = str(selected_merek_edit_raw).strip()
+                if edit_merek.lower().startswith("add:"):
+                    edit_merek = edit_merek[4:].strip()
+
+                matching_existing_edit = [
+                    m
+                    for m in base_merek_list
+                    if m.lower() == edit_merek.lower()
+                ]
+                if matching_existing_edit:
+                    edit_merek = matching_existing_edit[0]
+
+                # --- DROPDOWN MODEL DENGAN OPSI CERDAS ---
+                df_merek_edit_terpilih = df[
+                    df["Merek"].astype(str).str.strip().str.lower()
+                    == edit_merek.lower()
+                ]
+                base_model_edit_list = sorted(
+                    [
+                        mo
+                        for mo in df_merek_edit_terpilih[
+                            "Model"
+                        ].dropna().unique()
+                        if str(mo).strip() != ""
+                    ]
+                )
+                extended_model_set = set(base_model_edit_list)
+                for mo in base_model_edit_list:
+                    extended_model_set.add(mo.lower())
+                    extended_model_set.add(mo.upper())
+                existing_model_list = sorted(list(extended_model_set))
+
+                default_model_idx = (
+                    existing_model_list.index(val_model_asli)
+                    if val_model_asli in existing_model_list
+                    else 0
+                )
+
+                st.markdown(
+                    "Model <span style='color:red;'>*</span>",
+                    unsafe_allow_html=True,
+                )
+                selected_model_edit_raw = st.selectbox(
+                    "Model Edit Selectbox",
+                    options=existing_model_list,
+                    index=default_model_idx,
+                    accept_new_options=True,
+                    label_visibility="collapsed",
+                    key=f"edit_model_choice_{idx_pilih}",
+                )
+
+                edit_model = str(selected_model_edit_raw).strip()
+                if edit_model.lower().startswith("add:"):
+                    edit_model = edit_model[4:].strip()
+
+                matching_existing_model_edit = [
+                    mo
+                    for mo in base_model_edit_list
+                    if mo.lower() == edit_model.lower()
+                ]
+                if matching_existing_model_edit:
+                    edit_model = matching_existing_model_edit[0]
+
                 edit_tahun = st.text_input("Tahun", value=val_tahun_asli)
                 edit_ukuran = st.text_input("Ukuran", value=val_ukuran_asli)
                 edit_panjang = st.text_input("Panjang", value=val_panjang_asli)
