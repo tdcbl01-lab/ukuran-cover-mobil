@@ -116,30 +116,33 @@ def save_data_smart(df_target, file_path, commit_message):
 # --- FUNGSI MEMUAT DATA DARI GOOGLE SHEETS & FALLBACK LOKAL ---
 @st.cache_data(show_spinner=False)
 def load_data():
-    df = pd.DataFrame()
     try:
         url_csv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
         df = pd.read_csv(url_csv, dtype=str, keep_default_na=False)
+        if not df.empty:
+            df.columns = df.columns.str.strip()
+            if {"Merek", "Model", "Tahun"}.issubset(df.columns):
+                df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
+                df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
+                df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
+                df = df[df["_m"] != ""]
+                df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
+                df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
+                df = df.reset_index(drop=True)
+                if "ID" in df.columns:
+                    df["ID"] = (df.index + 1).astype(str)
+            for i in range(1, 5):
+                col_name = f"Foto{i}"
+                if col_name not in df.columns:
+                    df[col_name] = ""
+            return df
     except Exception:
         pass
 
-    if df.empty and os.path.exists(EXCEL_FILE):
-        try:
-            df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
-        except Exception:
-            pass
-
-    if not df.empty:
+    # Fallback ke file Excel lokal jika Google Sheets gagal dimuat
+    if os.path.exists(EXCEL_FILE):
+        df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
         df.columns = df.columns.str.strip()
-        if {"Merek", "Model", "Tahun"}.issubset(df.columns):
-            df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
-            df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
-            df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
-            df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
-            df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
-            df = df.reset_index(drop=True)
-            if "ID" in df.columns:
-                df["ID"] = (df.index + 1).astype(str)
         for i in range(1, 5):
             col_name = f"Foto{i}"
             if col_name not in df.columns:
@@ -226,14 +229,6 @@ with col_tagline:
     """,
         unsafe_allow_html=True,
     )
-
-# Tombol Clear Cache di Sidebar agar mudah menyegarkan data
-with st.sidebar:
-    st.markdown("### Pengaturan Sistem")
-    if st.button("🔄 Muat Ulang / Refresh Data"):
-        st.cache_data.clear()
-        st.success("Cache berhasil dibersihkan!")
-        st.rerun()
 
 st.markdown(
     "<hr style='margin-top: 10px; margin-bottom: 10px;'>", unsafe_allow_html=True
