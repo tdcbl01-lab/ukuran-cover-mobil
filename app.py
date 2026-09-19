@@ -28,7 +28,7 @@ st.markdown(
 
 EXCEL_FILE = "data_cover.xlsx"
 
-# --- LINK GOOGLE SHEETS ANDA ---
+# --- LINK GOOGLE SHEETS ANDA (SUPAYA TERHUBUNG KE DRIVE/SHEETS) ---
 SHEET_ID = "1embajr0ZrRRCs-pj5gnI32FqTOh3Je44"
 SHEET_NAME = "Sheet1"
 
@@ -113,36 +113,46 @@ def save_data_smart(df_target, file_path, commit_message):
         return False, str(e)
 
 
-# --- FUNGSI MEMUAT DATA DARI GOOGLE SHEETS & FALLBACK LOKAL ---
+# --- FUNGSI MEMUAT DATA (TERHUBUNG KE GOOGLE SHEETS & EXCEL LOKAL) ---
 @st.cache_data(show_spinner=False)
-def load_data():
+def load_data(file_mtime):
+    # Coba tarik data langsung dari Google Sheets / Google Drive terlebih dahulu
     try:
         url_csv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
-        df = pd.read_csv(url_csv, dtype=str, keep_default_na=False)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-            if {"Merek", "Model", "Tahun"}.issubset(df.columns):
-                df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
-                df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
-                df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
-                df = df[df["_m"] != ""]
-                df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
-                df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
-                df = df.reset_index(drop=True)
-                if "ID" in df.columns:
-                    df["ID"] = (df.index + 1).astype(str)
+        df_g = pd.read_csv(url_csv, dtype=str, keep_default_na=False)
+        if not df_g.empty:
+            df_g.columns = df_g.columns.str.strip()
+            if {"Merek", "Model", "Tahun"}.issubset(df_g.columns):
+                df_g["_m"] = df_g["Merek"].astype(str).str.strip().str.lower()
+                df_g["_mo"] = df_g["Model"].astype(str).str.strip().str.lower()
+                df_g["_t"] = df_g["Tahun"].astype(str).str.strip().str.lower()
+                df_g = df_g[df_g["_m"] != ""]
+                df_g = df_g.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
+                df_g = df_g.drop(columns=["_m", "_mo", "_t"], errors="ignore")
+                df_g = df_g.reset_index(drop=True)
+                if "ID" in df_g.columns:
+                    df_g["ID"] = (df_g.index + 1).astype(str)
             for i in range(1, 5):
                 col_name = f"Foto{i}"
-                if col_name not in df.columns:
-                    df[col_name] = ""
-            return df
+                if col_name not in df_g.columns:
+                    df_g[col_name] = ""
+            return df_g
     except Exception:
         pass
 
-    # Fallback ke file Excel lokal jika Google Sheets gagal dimuat
+    # Fallback ke file Excel lokal jika Google Sheets offline
     if os.path.exists(EXCEL_FILE):
         df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
-        df.columns = df.columns.str.strip()
+        if {"Merek", "Model", "Tahun"}.issubset(df.columns):
+            df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
+            df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
+            df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
+            df = df[df["_m"] != ""]
+            df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
+            df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
+            df = df.reset_index(drop=True)
+            if "ID" in df.columns:
+                df["ID"] = (df.index + 1).astype(str)
         for i in range(1, 5):
             col_name = f"Foto{i}"
             if col_name not in df.columns:
@@ -171,7 +181,9 @@ def load_data():
         return df_dummy
 
 
-df = load_data()
+file_mtime = os.path.getmtime(EXCEL_FILE) if os.path.exists(EXCEL_FILE) else 0
+
+df = load_data(file_mtime)
 df.columns = df.columns.str.strip()
 for i in range(1, 5):
     if f"Foto{i}" not in df.columns:
@@ -179,10 +191,15 @@ for i in range(1, 5):
 
 
 def get_next_id():
-    if not df.empty and "ID" in df.columns:
+    if os.path.exists(EXCEL_FILE):
+        df_check = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
+    else:
+        df_check = df
+
+    if not df_check.empty and "ID" in df_check.columns:
         try:
             valid_ids = pd.to_numeric(
-                df["ID"], errors="coerce"
+                df_check["ID"], errors="coerce"
             ).dropna()
             if not valid_ids.empty:
                 return int(valid_ids.max()) + 1
@@ -851,41 +868,19 @@ elif menu == "➕ Tambah / Edit Data":
                     if "Tahun" in df.columns
                     else ""
                 )
-                val_ukuran_asli = (
-                    str(df.loc[idx_pilih, "Ukuran"])
-                    if "Ukuran" in df.columns
-                    else ""
-                )
-                val_panjang_asli = (
-                    str(df.loc[idx_pilih, "Panjang"])
-                    if "Panjang" in df.columns
-                    else ""
-                )
-                val_lebar_asli = (
-                    str(df.loc[idx_pilih, "Lebar"])
-                    if "Lebar" in df.columns
-                    else ""
-                )
-                val_tinggi_asli = (
-                    str(df.loc[idx_pilih, "Tinggi"])
-                    if "Tinggi" in df.columns
-                    else ""
-                )
                 val_status_asli = (
                     str(df.loc[idx_pilih, "Status"])
                     if "Status" in df.columns
                     else "STANDAR"
                 )
-                val_catatan_asli = (
-                    str(df.loc[idx_pilih, "Catatan"])
-                    if "Catatan" in df.columns
-                    else ""
+
+                st.markdown(
+                    "Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.",
+                    unsafe_allow_html=True,
                 )
 
-                st.markdown("---")
-                st.markdown(f"**Edit Data [ID: {df.loc[idx_pilih, 'ID']}]**")
+                widget_values = {}
 
-                # --- DROPDOWN MEREK DENGAN OPSI CERDAS ---
                 base_merek_list = sorted(
                     [
                         m
@@ -930,7 +925,6 @@ elif menu == "➕ Tambah / Edit Data":
                 if matching_existing_edit:
                     edit_merek = matching_existing_edit[0]
 
-                # --- DROPDOWN MODEL DENGAN OPSI CERDAS ---
                 df_merek_edit_terpilih = df[
                     df["Merek"].astype(str).str.strip().str.lower()
                     == edit_merek.lower()
@@ -981,93 +975,152 @@ elif menu == "➕ Tambah / Edit Data":
                 if matching_existing_model_edit:
                     edit_model = matching_existing_model_edit[0]
 
-                edit_tahun = st.text_input("Tahun", value=val_tahun_asli)
-                edit_ukuran = st.text_input("Ukuran", value=val_ukuran_asli)
-                edit_panjang = st.text_input("Panjang", value=val_panjang_asli)
-                edit_lebar = st.text_input("Lebar", value=val_lebar_asli)
-                edit_tinggi = st.text_input("Tinggi", value=val_tinggi_asli)
+                st.markdown(
+                    "Tahun <span style='color:red;'>*</span>",
+                    unsafe_allow_html=True,
+                )
+                edit_tahun = st.text_input(
+                    "Tahun Edit",
+                    value=val_tahun_asli,
+                    label_visibility="collapsed",
+                    key=f"edit_tahun_{idx_pilih}",
+                )
 
+                edit_sisa_data = {}
+                for col in df.columns:
+                    if (
+                        col
+                        not in [
+                            "ID",
+                            "Pilihan_Edit",
+                            "Merek",
+                            "Model",
+                            "Tahun",
+                            "Status",
+                        ]
+                        + kolom_foto_list
+                    ):
+                        val_col_asli = (
+                            str(df.loc[idx_pilih, col])
+                            if col in df.columns
+                            else ""
+                        )
+                        if col in kolom_wajib:
+                            st.markdown(
+                                f"{col} <span style='color:red;'>*</span>",
+                                unsafe_allow_html=True,
+                            )
+                            edit_sisa_data[col] = st.text_input(
+                                f"edit_{col}",
+                                value=val_col_asli,
+                                label_visibility="collapsed",
+                                key=f"edit_{col}_{idx_pilih}",
+                            )
+                        else:
+                            st.markdown(f"{col}", unsafe_allow_html=True)
+                            edit_sisa_data[col] = st.text_input(
+                                f"edit_{col}",
+                                value=val_col_asli,
+                                label_visibility="collapsed",
+                                key=f"edit_{col}_{idx_pilih}",
+                            )
+
+                st.markdown(
+                    "Status <span style='color:red;'>*</span>",
+                    unsafe_allow_html=True,
+                )
                 try:
                     status_idx = list_status_fix.index(val_status_asli)
                 except ValueError:
                     status_idx = 0
                 edit_status = st.selectbox(
-                    "Status", list_status_fix, index=status_idx
+                    "Status Edit",
+                    list_status_fix,
+                    index=status_idx,
+                    label_visibility="collapsed",
+                    key=f"edit_status_{idx_pilih}",
                 )
-                edit_catatan = st.text_area("Catatan", value=val_catatan_asli)
 
-                st.markdown("### 📸 Kelola Foto Dokumentasi:")
+                st.markdown("---")
+                st.markdown("### 📸 Ganti Foto Dokumentasi (Opsional):")
                 edit_uploaded_files = {}
                 c1, c2 = st.columns(2)
                 with c1:
                     edit_uploaded_files["Foto1"] = st.file_uploader(
                         "Ganti Foto 1",
                         type=["jpg", "jpeg", "png"],
-                        key="edit_up_1",
+                        key=f"edit_up_1_{idx_pilih}",
                     )
                     edit_uploaded_files["Foto2"] = st.file_uploader(
                         "Ganti Foto 2",
                         type=["jpg", "jpeg", "png"],
-                        key="edit_up_2",
+                        key=f"edit_up_2_{idx_pilih}",
                     )
                 with c2:
                     edit_uploaded_files["Foto3"] = st.file_uploader(
                         "Ganti Foto 3",
                         type=["jpg", "jpeg", "png"],
-                        key="edit_up_3",
+                        key=f"edit_up_3_{idx_pilih}",
                     )
                     edit_uploaded_files["Foto4"] = st.file_uploader(
                         "Ganti Foto 4",
                         type=["jpg", "jpeg", "png"],
-                        key="edit_up_4",
+                        key=f"edit_up_4_{idx_pilih}",
                     )
 
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    if st.button("💾 Simpan Perubahan", type="primary"):
-                        df.loc[idx_pilih, "Merek"] = str(edit_merek).strip()
-                        df.loc[idx_pilih, "Model"] = str(edit_model).strip()
-                        df.loc[idx_pilih, "Tahun"] = str(edit_tahun).strip()
-                        df.loc[idx_pilih, "Ukuran"] = str(edit_ukuran).strip()
-                        df.loc[idx_pilih, "Panjang"] = str(edit_panjang).strip()
-                        df.loc[idx_pilih, "Lebar"] = str(edit_lebar).strip()
-                        df.loc[idx_pilih, "Tinggi"] = str(edit_tinggi).strip()
-                        df.loc[idx_pilih, "Status"] = str(edit_status).strip()
-                        df.loc[idx_pilih, "Catatan"] = str(edit_catatan).strip()
-
-                        timestamp_awalan = int(datetime.now().timestamp())
-                        for key_f, up_f in edit_uploaded_files.items():
-                            if up_f is not None:
-                                nama_file_foto = (
-                                    f"{timestamp_awalan}_{key_f}_{up_f.name}"
-                                )
-                                path_simpan = os.path.join(
-                                    FOTO_FOLDER, nama_file_foto
-                                )
-                                with open(path_simpan, "wb") as f:
-                                    f.write(up_f.getbuffer())
-                                df.loc[idx_pilih, key_f] = nama_file_foto
-
-                        sukses_simpan, err_msg = save_data_smart(
-                            df,
-                            EXCEL_FILE,
-                            f"Update data ID {df.loc[idx_pilih, 'ID']} via Streamlit",
-                        )
-
-                        if sukses_simpan:
-                            st.cache_data.clear()
-                            st.session_state["popup_title"] = "Berhasil!"
-                            st.session_state[
-                                "popup_msg"
-                            ] = "Perubahan data berhasil disimpan secara permanen!"
-                            st.session_state["popup_type"] = "success"
-                            st.session_state["show_popup"] = "aktif"
-                            st.rerun()
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    if st.button("💾 Simpan Perubahan", type="primary", key=f"btn_save_{idx_pilih}"):
+                        if (
+                            not str(edit_merek).strip()
+                            or not str(edit_model).strip()
+                            or not str(edit_tahun).strip()
+                        ):
+                            st.error(
+                                "❌ Gagal! Merek, Model, dan Tahun wajib diisi!"
+                            )
                         else:
-                            st.error(f"❌ Gagal memperbarui data: {err_msg}")
+                            df.loc[idx_pilih, "Merek"] = str(edit_merek).strip()
+                            df.loc[idx_pilih, "Model"] = str(edit_model).strip()
+                            df.loc[idx_pilih, "Tahun"] = str(edit_tahun).strip()
+                            df.loc[idx_pilih, "Status"] = str(edit_status).strip()
 
-                with col_btn2:
-                    if st.button("🗑️ Hapus Data Ini", type="secondary"):
+                            for k, v in edit_sisa_data.items():
+                                df.loc[idx_pilih, k] = str(v).strip()
+
+                            timestamp_awalan = int(datetime.now().timestamp())
+                            for key_f, up_f in edit_uploaded_files.items():
+                                if up_f is not None:
+                                    nama_file_foto = (
+                                        f"{timestamp_awalan}_{key_f}_{up_f.name}"
+                                    )
+                                    path_simpan = os.path.join(
+                                        FOTO_FOLDER, nama_file_foto
+                                    )
+                                    with open(path_simpan, "wb") as f:
+                                        f.write(up_f.getbuffer())
+                                    df.loc[idx_pilih, key_f] = nama_file_foto
+
+                            sukses_simpan, err_msg = save_data_smart(
+                                df,
+                                EXCEL_FILE,
+                                f"Update data ID {df.loc[idx_pilih, 'ID']} via Streamlit",
+                            )
+
+                            if sukses_simpan:
+                                st.cache_data.clear()
+                                st.session_state["popup_title"] = "Berhasil!"
+                                st.session_state[
+                                    "popup_msg"
+                                ] = "Perubahan data berhasil disimpan secara permanen!"
+                                st.session_state["popup_type"] = "success"
+                                st.session_state["show_popup"] = "aktif"
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Gagal memperbarui data: {err_msg}")
+
+                with col_b2:
+                    if st.button("🗑️ Hapus Data Ini", type="secondary", key=f"btn_del_{idx_pilih}"):
                         df = df.drop(idx_pilih).reset_index(drop=True)
                         if "ID" in df.columns and not df.empty:
                             df["ID"] = (df.index + 1).astype(str)
@@ -1075,7 +1128,7 @@ elif menu == "➕ Tambah / Edit Data":
                         sukses_simpan, err_msg = save_data_smart(
                             df,
                             EXCEL_FILE,
-                            f"Hapus data via Streamlit",
+                            f"Hapus data ID {df.loc[idx_pilih, 'ID']} via Streamlit",
                         )
 
                         if sukses_simpan:
