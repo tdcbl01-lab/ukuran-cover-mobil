@@ -30,7 +30,7 @@ EXCEL_FILE = "data_cover.xlsx"
 
 # --- LINK GOOGLE SHEETS ANDA ---
 SHEET_ID = "1embajr0ZrRRCs-pj5gnI32FqTOh3Je44"
-SHEET_NAME = "Sheet1"  # Sesuaikan nama sheet di bawah jika berbeda
+SHEET_NAME = "Sheet1"
 
 
 # --- FUNGSI PENYIMPANAN CERDAS DENGAN TOKEN CLASSIC & GITHUB API ---
@@ -539,8 +539,7 @@ elif menu == "➕ Tambah / Edit Data":
             next_id = get_next_id()
 
             st.markdown(
-                "Kolom dengan tanda <span style='color:red;'>*</span> wajib"
-                " diisi.",
+                "Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.",
                 unsafe_allow_html=True,
             )
             st.markdown(
@@ -703,8 +702,7 @@ elif menu == "➕ Tambah / Edit Data":
                     or not str(input_tahun).strip()
                 ):
                     st.error(
-                        "❌ Gagal! Merek, Model, dan Tahun wajib diisi dengan"
-                        " benar!"
+                        "❌ Gagal! Merek, Model, dan Tahun wajib diisi dengan benar!"
                     )
                 else:
                     if os.path.exists(EXCEL_FILE):
@@ -841,12 +839,30 @@ elif menu == "➕ Tambah / Edit Data":
                 val_merek_asli = df.loc[idx_pilih, "Merek"]
                 val_model_asli = df.loc[idx_pilih, "Model"]
                 val_tahun_asli = df.loc[idx_pilih, "Tahun"]
-                val_ukuran_asli = df.loc[idx_pilih, "Ukuran"] if "Ukuran" in df.columns else ""
-                val_panjang_asli = df.loc[idx_pilih, "Panjang"] if "Panjang" in df.columns else ""
-                val_lebar_asli = df.loc[idx_pilih, "Lebar"] if "Lebar" in df.columns else ""
-                val_tinggi_asli = df.loc[idx_pilih, "Tinggi"] if "Tinggi" in df.columns else ""
-                val_status_asli = df.loc[idx_pilih, "Status"] if "Status" in df.columns else "STANDAR"
-                val_catatan_asli = df.loc[idx_pilih, "Catatan"] if "Catatan" in df.columns else ""
+                val_ukuran_asli = (
+                    df.loc[idx_pilih, "Ukuran"] if "Ukuran" in df.columns else ""
+                )
+                val_panjang_asli = (
+                    df.loc[idx_pilih, "Panjang"]
+                    if "Panjang" in df.columns
+                    else ""
+                )
+                val_lebar_asli = (
+                    df.loc[idx_pilih, "Lebar"] if "Lebar" in df.columns else ""
+                )
+                val_tinggi_asli = (
+                    df.loc[idx_pilih, "Tinggi"] if "Tinggi" in df.columns else ""
+                )
+                val_status_asli = (
+                    df.loc[idx_pilih, "Status"]
+                    if "Status" in df.columns
+                    else "STANDAR"
+                )
+                val_catatan_asli = (
+                    df.loc[idx_pilih, "Catatan"]
+                    if "Catatan" in df.columns
+                    else ""
+                )
 
                 st.markdown("---")
                 st.markdown(f"**Edit Data [ID: {df.loc[idx_pilih, 'ID']}]**")
@@ -863,7 +879,9 @@ elif menu == "➕ Tambah / Edit Data":
                     status_idx = list_status_fix.index(val_status_asli)
                 except ValueError:
                     status_idx = 0
-                edit_status = st.selectbox("Status", list_status_fix, index=status_idx)
+                edit_status = st.selectbox(
+                    "Status", list_status_fix, index=status_idx
+                )
                 edit_catatan = st.text_area("Catatan", value=val_catatan_asli)
 
                 st.markdown("### 📸 Kelola Foto Dokumentasi:")
@@ -871,17 +889,25 @@ elif menu == "➕ Tambah / Edit Data":
                 c1, c2 = st.columns(2)
                 with c1:
                     edit_uploaded_files["Foto1"] = st.file_uploader(
-                        "Ganti Foto 1", type=["jpg", "jpeg", "png"], key="edit_up_1"
+                        "Ganti Foto 1",
+                        type=["jpg", "jpeg", "png"],
+                        key="edit_up_1",
                     )
                     edit_uploaded_files["Foto2"] = st.file_uploader(
-                        "Ganti Foto 2", type=["jpg", "jpeg", "png"], key="edit_up_2"
+                        "Ganti Foto 2",
+                        type=["jpg", "jpeg", "png"],
+                        key="edit_up_2",
                     )
                 with c2:
                     edit_uploaded_files["Foto3"] = st.file_uploader(
-                        "Ganti Foto 3", type=["jpg", "jpeg", "png"], key="edit_up_3"
+                        "Ganti Foto 3",
+                        type=["jpg", "jpeg", "png"],
+                        key="edit_up_3",
                     )
                     edit_uploaded_files["Foto4"] = st.file_uploader(
-                        "Ganti Foto 4", type=["jpg", "jpeg", "png"], key="edit_up_4"
+                        "Ganti Foto 4",
+                        type=["jpg", "jpeg", "png"],
+                        key="edit_up_4",
                     )
 
                 col_btn1, col_btn2 = st.columns(2)
@@ -942,7 +968,9 @@ elif menu == "➕ Tambah / Edit Data":
 
                         if sukses_simpan:
                             st.cache_data.clear()
-                            st.session_state["popup_title"] = "Berhasil Dihapus!"
+                            st.session_state["popup_title"] = (
+                                "Berhasil Dihapus!"
+                            )
                             st.session_state[
                                 "popup_msg"
                             ] = "Data berhasil dihapus dari database."
