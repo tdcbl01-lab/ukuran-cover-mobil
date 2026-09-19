@@ -28,6 +28,10 @@ st.markdown(
 
 EXCEL_FILE = "data_cover.xlsx"
 
+# --- LINK GOOGLE SHEETS ANDA ---
+SHEET_ID = "1embajr0ZrRRCs-pj5gnI32FqTOh3Je44"
+SHEET_NAME = "Sheet1"  # Sesuaikan nama sheet di bawah jika berbeda
+
 
 # --- FUNGSI PENYIMPANAN CERDAS DENGAN TOKEN CLASSIC & GITHUB API ---
 def save_data_smart(df_target, file_path, commit_message):
@@ -109,21 +113,36 @@ def save_data_smart(df_target, file_path, commit_message):
         return False, str(e)
 
 
-# --- FUNGSI MEMUAT DATA DENGAN DETEKSI PERUBAHAN FILE OTOMATIS ---
+# --- FUNGSI MEMUAT DATA DARI GOOGLE SHEETS & FALLBACK LOKAL ---
 @st.cache_data(show_spinner=False)
-def load_data(file_mtime):
+def load_data():
+    try:
+        url_csv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
+        df = pd.read_csv(url_csv, dtype=str, keep_default_na=False)
+        if not df.empty:
+            df.columns = df.columns.str.strip()
+            if {"Merek", "Model", "Tahun"}.issubset(df.columns):
+                df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
+                df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
+                df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
+                df = df[df["_m"] != ""]
+                df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
+                df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
+                df = df.reset_index(drop=True)
+                if "ID" in df.columns:
+                    df["ID"] = (df.index + 1).astype(str)
+            for i in range(1, 5):
+                col_name = f"Foto{i}"
+                if col_name not in df.columns:
+                    df[col_name] = ""
+            return df
+    except Exception:
+        pass
+
+    # Fallback ke file Excel lokal jika Google Sheets gagal dimuat
     if os.path.exists(EXCEL_FILE):
         df = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
-        if {"Merek", "Model", "Tahun"}.issubset(df.columns):
-            df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
-            df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
-            df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
-            df = df[df["_m"] != ""]
-            df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
-            df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
-            df = df.reset_index(drop=True)
-            if "ID" in df.columns:
-                df["ID"] = (df.index + 1).astype(str)
+        df.columns = df.columns.str.strip()
         for i in range(1, 5):
             col_name = f"Foto{i}"
             if col_name not in df.columns:
@@ -152,9 +171,7 @@ def load_data(file_mtime):
         return df_dummy
 
 
-file_mtime = os.path.getmtime(EXCEL_FILE) if os.path.exists(EXCEL_FILE) else 0
-
-df = load_data(file_mtime)
+df = load_data()
 df.columns = df.columns.str.strip()
 for i in range(1, 5):
     if f"Foto{i}" not in df.columns:
@@ -162,15 +179,10 @@ for i in range(1, 5):
 
 
 def get_next_id():
-    if os.path.exists(EXCEL_FILE):
-        df_check = pd.read_excel(EXCEL_FILE, dtype=str, keep_default_na=False)
-    else:
-        df_check = df
-
-    if not df_check.empty and "ID" in df_check.columns:
+    if not df.empty and "ID" in df.columns:
         try:
             valid_ids = pd.to_numeric(
-                df_check["ID"], errors="coerce"
+                df["ID"], errors="coerce"
             ).dropna()
             if not valid_ids.empty:
                 return int(valid_ids.max()) + 1
@@ -826,364 +838,116 @@ elif menu == "➕ Tambah / Edit Data":
                 )
                 idx_pilih = int(idx_str.split(" - ")[0])
 
-                val_merek_asli = (
-                    str(df.loc[idx_pilih, "Merek"])
-                    if "Merek" in df.columns
-                    else ""
-                )
-                val_model_asli = (
-                    str(df.loc[idx_pilih, "Model"])
-                    if "Model" in df.columns
-                    else ""
-                )
-                val_tahun_asli = (
-                    str(df.loc[idx_pilih, "Tahun"])
-                    if "Tahun" in df.columns
-                    else ""
-                )
-                val_status_asli = (
-                    str(df.loc[idx_pilih, "Status"])
-                    if "Status" in df.columns
-                    else "STANDAR"
-                )
-
-                st.markdown(
-                    "Kolom dengan tanda <span style='color:red;'>*</span> wajib"
-                    " diisi.",
-                    unsafe_allow_html=True,
-                )
-
-                widget_values = {}
-
-                base_merek_list = sorted(
-                    [
-                        m
-                        for m in df["Merek"].dropna().unique()
-                        if str(m).strip() != ""
-                    ]
-                )
-                extended_merek_set = set(base_merek_list)
-                for m in base_merek_list:
-                    extended_merek_set.add(m.lower())
-                    extended_merek_set.add(m.upper())
-                existing_merek_list = sorted(list(extended_merek_set))
-
-                default_merek_idx = (
-                    existing_merek_list.index(val_merek_asli)
-                    if val_merek_asli in existing_merek_list
-                    else 0
-                )
-
-                st.markdown(
-                    "Merek <span style='color:red;'>*</span>",
-                    unsafe_allow_html=True,
-                )
-                selected_merek_edit_raw = st.selectbox(
-                    "Merek Edit Selectbox",
-                    options=existing_merek_list,
-                    index=default_merek_idx,
-                    accept_new_options=True,
-                    label_visibility="collapsed",
-                    key=f"edit_merek_choice_{idx_pilih}",
-                )
-
-                selected_merek = str(selected_merek_edit_raw).strip()
-                if selected_merek.lower().startswith("add:"):
-                    selected_merek = selected_merek[4:].strip()
-
-                matching_existing_edit = [
-                    m
-                    for m in base_merek_list
-                    if m.lower() == selected_merek.lower()
-                ]
-                if matching_existing_edit:
-                    selected_merek = matching_existing_edit[0]
-
-                widget_values["Merek"] = selected_merek
-
-                daftar_model_berdasarkan_merek = sorted(
-                    list(
-                        set(
-                            [
-                                str(m).strip()
-                                for m in df[
-                                    df["Merek"].str.strip().str.lower()
-                                    == selected_merek.strip().lower()
-                                ]["Model"]
-                                .dropna()
-                                .unique()
-                                if str(m).strip() != ""
-                            ]
-                        )
-                    )
-                )
-
-                st.markdown(
-                    "Model <span style='color:red;'>*</span>",
-                    unsafe_allow_html=True,
-                )
-                if daftar_model_berdasarkan_merek:
-                    if (
-                        val_model_asli not in daftar_model_berdasarkan_merek
-                        and selected_merek.strip().lower()
-                        == val_merek_asli.strip().lower()
-                    ):
-                        daftar_model_berdasarkan_merek.insert(
-                            0, val_model_asli
-                        )
-
-                    default_model_idx = (
-                        daftar_model_berdasarkan_merek.index(val_model_asli)
-                        if (
-                            selected_merek.strip().lower()
-                            == val_merek_asli.strip().lower()
-                            and val_model_asli in daftar_model_berdasarkan_merek
-                        )
-                        else 0
-                    )
-
-                    selected_model = st.selectbox(
-                        "Model Edit Select",
-                        daftar_model_berdasarkan_merek,
-                        index=default_model_idx,
-                        label_visibility="collapsed",
-                        key=f"edit_model_sel_{idx_pilih}",
-                    )
-                else:
-                    initial_model_val = (
-                        val_model_asli
-                        if selected_merek.strip().lower()
-                        == val_merek_asli.strip().lower()
-                        else ""
-                    )
-                    selected_model = st.text_input(
-                        "Model Edit Text",
-                        value=initial_model_val,
-                        placeholder="Contoh: J7, E5",
-                        label_visibility="collapsed",
-                        key=f"edit_model_txt_{idx_pilih}",
-                    )
-
-                widget_values["Model"] = selected_model
-
-                df_ref_matched = df[
-                    (
-                        df["Merek"].str.strip().str.lower()
-                        == selected_merek.strip().lower()
-                    )
-                    & (
-                        df["Model"].str.strip().str.lower()
-                        == selected_model.strip().lower()
-                    )
-                ]
-                if not df_ref_matched.empty:
-                    row_ref = df_ref_matched.iloc[-1]
-                else:
-                    row_ref = df.loc[idx_pilih]
-
-                dynamic_key_suffix = f"{selected_merek}_{selected_model}".replace(
-                    " ", "_"
-                )
-
-                for col in df.columns:
-                    if (
-                        col
-                        not in [
-                            "ID",
-                            "Pilihan_Edit",
-                            "Merek",
-                            "Model",
-                            "Tahun",
-                            "Status",
-                        ]
-                        + kolom_foto_list
-                    ):
-                        val_lama = str(row_ref[col]) if col in row_ref else ""
-                        if val_lama.lower() in ["nan", "none"]:
-                            val_lama = ""
-                        if col == "Catatan" and val_lama:
-                            val_lama = re.sub(
-                                r"\s*([\|–-]|Terakhir diedit|Diedit"
-                                r" tgl|Pernah diedit).*$",
-                                "",
-                                val_lama,
-                            ).strip()
-
-                        widget_key = (
-                            f"edit_{col}_{idx_pilih}_{dynamic_key_suffix}"
-                        )
-
-                        if col in kolom_wajib:
-                            st.markdown(
-                                f"{col} <span style='color:red;'>*</span>",
-                                unsafe_allow_html=True,
-                            )
-                            widget_values[col] = st.text_input(
-                                f"{col} Edit",
-                                value=val_lama,
-                                label_visibility="collapsed",
-                                key=widget_key,
-                            )
-                        else:
-                            st.markdown(f"{col}", unsafe_allow_html=True)
-                            widget_values[col] = st.text_input(
-                                f"{col} Edit",
-                                value=val_lama,
-                                label_visibility="collapsed",
-                                key=widget_key,
-                            )
-
-                val_tahun_ref = (
-                    str(row_ref["Tahun"])
-                    if "Tahun" in row_ref
-                    else val_tahun_asli
-                )
-                if val_tahun_ref.lower() in ["nan", "none"]:
-                    val_tahun_ref = val_tahun_asli
-
-                st.markdown(
-                    "Tahun <span style='color:red;'>*</span>",
-                    unsafe_allow_html=True,
-                )
-                tahun_key = f"edit_tahun_{idx_pilih}_{dynamic_key_suffix}"
-                widget_values["Tahun"] = st.text_input(
-                    "Tahun Edit",
-                    value=val_tahun_ref,
-                    label_visibility="collapsed",
-                    key=tahun_key,
-                )
-
-                val_status_ref = (
-                    str(row_ref["Status"])
-                    if "Status" in row_ref
-                    else val_status_asli
-                )
-                if val_status_ref not in list_status_fix:
-                    val_status_ref = "STANDAR"
-                default_idx_status = (
-                    list_status_fix.index(val_status_ref)
-                    if val_status_ref in list_status_fix
-                    else 0
-                )
-
-                st.markdown(
-                    "Status <span style='color:red;'>*</span>",
-                    unsafe_allow_html=True,
-                )
-                status_key = f"edit_status_{idx_pilih}_{dynamic_key_suffix}"
-                widget_values["Status"] = st.selectbox(
-                    "Status Edit",
-                    list_status_fix,
-                    index=default_idx_status,
-                    label_visibility="collapsed",
-                    key=status_key,
-                )
+                val_merek_asli = df.loc[idx_pilih, "Merek"]
+                val_model_asli = df.loc[idx_pilih, "Model"]
+                val_tahun_asli = df.loc[idx_pilih, "Tahun"]
+                val_ukuran_asli = df.loc[idx_pilih, "Ukuran"] if "Ukuran" in df.columns else ""
+                val_panjang_asli = df.loc[idx_pilih, "Panjang"] if "Panjang" in df.columns else ""
+                val_lebar_asli = df.loc[idx_pilih, "Lebar"] if "Lebar" in df.columns else ""
+                val_tinggi_asli = df.loc[idx_pilih, "Tinggi"] if "Tinggi" in df.columns else ""
+                val_status_asli = df.loc[idx_pilih, "Status"] if "Status" in df.columns else "STANDAR"
+                val_catatan_asli = df.loc[idx_pilih, "Catatan"] if "Catatan" in df.columns else ""
 
                 st.markdown("---")
-                st.markdown("### 📸 Ganti Foto Dokumentasi:")
-                uploaded_files_edit = {}
+                st.markdown(f"**Edit Data [ID: {df.loc[idx_pilih, 'ID']}]**")
+
+                edit_merek = st.text_input("Merek", value=val_merek_asli)
+                edit_model = st.text_input("Model", value=val_model_asli)
+                edit_tahun = st.text_input("Tahun", value=val_tahun_asli)
+                edit_ukuran = st.text_input("Ukuran", value=val_ukuran_asli)
+                edit_panjang = st.text_input("Panjang", value=val_panjang_asli)
+                edit_lebar = st.text_input("Lebar", value=val_lebar_asli)
+                edit_tinggi = st.text_input("Tinggi", value=val_tinggi_asli)
+
+                try:
+                    status_idx = list_status_fix.index(val_status_asli)
+                except ValueError:
+                    status_idx = 0
+                edit_status = st.selectbox("Status", list_status_fix, index=status_idx)
+                edit_catatan = st.text_area("Catatan", value=val_catatan_asli)
+
+                st.markdown("### 📸 Kelola Foto Dokumentasi:")
+                edit_uploaded_files = {}
                 c1, c2 = st.columns(2)
                 with c1:
-                    uploaded_files_edit["Foto1"] = st.file_uploader(
-                        "Ganti Foto 1",
-                        type=["jpg", "jpeg", "png"],
-                        key=f"up_e1_{idx_pilih}",
+                    edit_uploaded_files["Foto1"] = st.file_uploader(
+                        "Ganti Foto 1", type=["jpg", "jpeg", "png"], key="edit_up_1"
                     )
-                    uploaded_files_edit["Foto2"] = st.file_uploader(
-                        "Ganti Foto 2",
-                        type=["jpg", "jpeg", "png"],
-                        key=f"up_e2_{idx_pilih}",
+                    edit_uploaded_files["Foto2"] = st.file_uploader(
+                        "Ganti Foto 2", type=["jpg", "jpeg", "png"], key="edit_up_2"
                     )
                 with c2:
-                    uploaded_files_edit["Foto3"] = st.file_uploader(
-                        "Ganti Foto 3",
-                        type=["jpg", "jpeg", "png"],
-                        key=f"up_e3_{idx_pilih}",
+                    edit_uploaded_files["Foto3"] = st.file_uploader(
+                        "Ganti Foto 3", type=["jpg", "jpeg", "png"], key="edit_up_3"
                     )
-                    uploaded_files_edit["Foto4"] = st.file_uploader(
-                        "Ganti Foto 4",
-                        type=["jpg", "jpeg", "png"],
-                        key=f"up_e4_{idx_pilih}",
+                    edit_uploaded_files["Foto4"] = st.file_uploader(
+                        "Ganti Foto 4", type=["jpg", "jpeg", "png"], key="edit_up_4"
                     )
 
-                if st.button(
-                    "💾 Perbarui & Simpan Perubahan", type="primary"
-                ):
-                    if (
-                        not str(widget_values["Merek"]).strip()
-                        or not str(widget_values["Model"]).strip()
-                        or not str(widget_values["Tahun"]).strip()
-                    ):
-                        st.error(
-                            "❌ Gagal! Merek, Model, dan Tahun wajib diisi"
-                            " dengan benar!"
-                        )
-                    else:
-                        df_edit_lokal = df.copy()
-                        for col_w, val_w in widget_values.items():
-                            if col_w in df_edit_lokal.columns:
-                                df_edit_lokal.loc[idx_pilih, col_w] = (
-                                    str(val_w).strip()
-                                )
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("💾 Simpan Perubahan", type="primary"):
+                        df.loc[idx_pilih, "Merek"] = str(edit_merek).strip()
+                        df.loc[idx_pilih, "Model"] = str(edit_model).strip()
+                        df.loc[idx_pilih, "Tahun"] = str(edit_tahun).strip()
+                        df.loc[idx_pilih, "Ukuran"] = str(edit_ukuran).strip()
+                        df.loc[idx_pilih, "Panjang"] = str(edit_panjang).strip()
+                        df.loc[idx_pilih, "Lebar"] = str(edit_lebar).strip()
+                        df.loc[idx_pilih, "Tinggi"] = str(edit_tinggi).strip()
+                        df.loc[idx_pilih, "Status"] = str(edit_status).strip()
+                        df.loc[idx_pilih, "Catatan"] = str(edit_catatan).strip()
 
-                        timestamp_edit = int(datetime.now().timestamp())
-                        catatan_riwayat_baru = (
-                            f"Diedit tgl {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                        )
-                        if (
-                            "Catatan" in df_edit_lokal.columns
-                            and str(df_edit_lokal.loc[idx_pilih, "Catatan"])
-                            .strip()
-                            .lower()
-                            not in ["nan", "none", ""]
-                        ):
-                            catatan_lama = str(
-                                df_edit_lokal.loc[idx_pilih, "Catatan"]
-                            ).strip()
-                            df_edit_lokal.loc[idx_pilih, "Catatan"] = (
-                                f"{catatan_lama} | {catatan_riwayat_baru}"
-                            )
-                        else:
-                            if "Catatan" in df_edit_lokal.columns:
-                                df_edit_lokal.loc[idx_pilih, "Catatan"] = (
-                                    catatan_riwayat_baru
-                                )
-
-                        for key_f, up_f in uploaded_files_edit.items():
+                        timestamp_awalan = int(datetime.now().timestamp())
+                        for key_f, up_f in edit_uploaded_files.items():
                             if up_f is not None:
                                 nama_file_foto = (
-                                    f"{timestamp_edit}_{key_f}_{up_f.name}"
+                                    f"{timestamp_awalan}_{key_f}_{up_f.name}"
                                 )
                                 path_simpan = os.path.join(
                                     FOTO_FOLDER, nama_file_foto
                                 )
                                 with open(path_simpan, "wb") as f:
                                     f.write(up_f.getbuffer())
-                                if key_f in df_edit_lokal.columns:
-                                    df_edit_lokal.loc[idx_pilih, key_f] = (
-                                        nama_file_foto
-                                    )
+                                df.loc[idx_pilih, key_f] = nama_file_foto
 
-                        sukses_edit, err_msg_edit = save_data_smart(
-                            df_edit_lokal,
+                        sukses_simpan, err_msg = save_data_smart(
+                            df,
                             EXCEL_FILE,
-                            f"Edit data ID {df_edit_lokal.loc[idx_pilih, 'ID']} via Streamlit",
+                            f"Update data ID {df.loc[idx_pilih, 'ID']} via Streamlit",
                         )
 
-                        if sukses_edit:
+                        if sukses_simpan:
                             st.cache_data.clear()
-                            st.session_state["popup_title"] = (
-                                "Perubahan Disimpan!"
-                            )
+                            st.session_state["popup_title"] = "Berhasil!"
                             st.session_state[
                                 "popup_msg"
-                            ] = "Data berhasil diperbarui dan disinkronkan secara online ke repository GitHub!"
+                            ] = "Perubahan data berhasil disimpan secara permanen!"
                             st.session_state["popup_type"] = "success"
                             st.session_state["show_popup"] = "aktif"
                             st.rerun()
                         else:
-                            st.error(
-                                f"❌ Gagal memperbarui data: {err_msg_edit}"
-                            )
+                            st.error(f"❌ Gagal memperbarui data: {err_msg}")
 
+                with col_btn2:
+                    if st.button("🗑️ Hapus Data Ini", type="secondary"):
+                        df = df.drop(idx_pilih).reset_index(drop=True)
+                        if "ID" in df.columns and not df.empty:
+                            df["ID"] = (df.index + 1).astype(str)
 
+                        sukses_simpan, err_msg = save_data_smart(
+                            df,
+                            EXCEL_FILE,
+                            f"Hapus data via Streamlit",
+                        )
+
+                        if sukses_simpan:
+                            st.cache_data.clear()
+                            st.session_state["popup_title"] = "Berhasil Dihapus!"
+                            st.session_state[
+                                "popup_msg"
+                            ] = "Data berhasil dihapus dari database."
+                            st.session_state["popup_type"] = "success"
+                            st.session_state["show_popup"] = "aktif"
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Gagal menghapus data: {err_msg}")
