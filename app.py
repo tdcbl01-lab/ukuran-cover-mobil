@@ -109,27 +109,29 @@ def save_data_smart(df_target, file_path, commit_message):
 def load_data(file_mtime):
     absolute_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), EXCEL_FILE) if "__file__" in locals() else EXCEL_FILE
     
-    # 1. PRIORITAS UTAMA: Baca langsung dari Google Sheets (Google Drive)
+    # 1. PRIORITAS UTAMA: Baca langsung dari Google Sheets (Google Drive) via link export CSV
     try:
-        url_csv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
-        df_g = pd.read_csv(url_csv, dtype=str, keep_default_na=False)
-        if not df_g.empty:
-            df_g.columns = df_g.columns.str.strip()
-            if {"Merek", "Model", "Tahun"}.issubset(df_g.columns):
-                df_g["_m"] = df_g["Merek"].astype(str).str.strip().str.lower()
-                df_g["_mo"] = df_g["Model"].astype(str).str.strip().str.lower()
-                df_g["_t"] = df_g["Tahun"].astype(str).str.strip().str.lower()
-                df_g = df_g[df_g["_m"] != ""]
-                df_g = df_g.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
-                df_g = df_g.drop(columns=["_m", "_mo", "_t"], errors="ignore")
-                df_g = df_g.reset_index(drop=True)
-                if "ID" in df_g.columns:
-                    df_g["ID"] = (df_g.index + 1).astype(str)
-            for i in range(1, 5):
-                col_name = f"Foto{i}"
-                if col_name not in df_g.columns:
-                    df_g[col_name] = ""
-            return df_g
+        url_csv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet={SHEET_NAME}"
+        r = requests.get(url_csv)
+        if r.status_code == 200:
+            df_g = pd.read_csv(BytesIO(r.content), dtype=str, keep_default_na=False)
+            if not df_g.empty:
+                df_g.columns = df_g.columns.str.strip()
+                if {"Merek", "Model", "Tahun"}.issubset(df_g.columns):
+                    df_g["_m"] = df_g["Merek"].astype(str).str.strip().str.lower()
+                    df_g["_mo"] = df_g["Model"].astype(str).str.strip().str.lower()
+                    df_g["_t"] = df_g["Tahun"].astype(str).str.strip().str.lower()
+                    df_g = df_g[df_g["_m"] != ""]
+                    df_g = df_g.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
+                    df_g = df_g.drop(columns=["_m", "_mo", "_t"], errors="ignore")
+                    df_g = df_g.reset_index(drop=True)
+                    if "ID" in df_g.columns:
+                        df_g["ID"] = (df_g.index + 1).astype(str)
+                for i in range(1, 5):
+                    col_name = f"Foto{i}"
+                    if col_name not in df_g.columns:
+                        df_g[col_name] = ""
+                return df_g
     except Exception:
         pass
 
