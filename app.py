@@ -104,10 +104,12 @@ def save_data_smart(df_target, file_path, commit_message):
         return False, str(e)
 
 
-# --- FUNGSI MEMUAT DATA ---
+# --- FUNGSI MEMUAT DATA (PRIORITAS UTAMA: GOOGLE SHEETS / DRIVE) ---
 @st.cache_data(show_spinner=False)
 def load_data(file_mtime):
     absolute_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), EXCEL_FILE) if "__file__" in locals() else EXCEL_FILE
+    
+    # 1. PRIORITAS UTAMA: Baca langsung dari Google Sheets (Google Drive)
     try:
         url_csv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
         df_g = pd.read_csv(url_csv, dtype=str, keep_default_na=False)
@@ -131,46 +133,39 @@ def load_data(file_mtime):
     except Exception:
         pass
 
+    # 2. CADANGAN: Baca Excel Lokal jika Google Sheets gagal diakses
     if os.path.exists(absolute_file_path):
-        df = pd.read_excel(absolute_file_path, dtype=str, keep_default_na=False)
-        if not df.empty:
-            df.columns = df.columns.str.strip()
-        if {"Merek", "Model", "Tahun"}.issubset(df.columns):
-            df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
-            df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
-            df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
-            df = df[df["_m"] != ""]
-            df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
-            df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
-            df = df.reset_index(drop=True)
-            if "ID" in df.columns:
-                df["ID"] = (df.index + 1).astype(str)
-        for i in range(1, 5):
-            col_name = f"Foto{i}"
-            if col_name not in df.columns:
-                df[col_name] = ""
-        return df
-    else:
-        df_dummy = pd.DataFrame(
-            columns=[
-                "ID",
-                "Merek",
-                "Model",
-                "Tahun",
-                "Ukuran",
-                "Panjang",
-                "Lebar",
-                "Tinggi",
-                "Status",
-                "Catatan",
-                "Foto1",
-                "Foto2",
-                "Foto3",
-                "Foto4",
-            ]
-        )
-        df_dummy.to_excel(absolute_file_path, index=False)
-        return df_dummy
+        try:
+            df = pd.read_excel(absolute_file_path, dtype=str, keep_default_na=False)
+            if not df.empty:
+                df.columns = df.columns.str.strip()
+                if {"Merek", "Model", "Tahun"}.issubset(df.columns):
+                    df["_m"] = df["Merek"].astype(str).str.strip().str.lower()
+                    df["_mo"] = df["Model"].astype(str).str.strip().str.lower()
+                    df["_t"] = df["Tahun"].astype(str).str.strip().str.lower()
+                    df = df[df["_m"] != ""]
+                    df = df.drop_duplicates(subset=["_m", "_mo", "_t"], keep="last")
+                    df = df.drop(columns=["_m", "_mo", "_t"], errors="ignore")
+                    df = df.reset_index(drop=True)
+                    if "ID" in df.columns:
+                        df["ID"] = (df.index + 1).astype(str)
+                for i in range(1, 5):
+                    col_name = f"Foto{i}"
+                    if col_name not in df.columns:
+                        df[col_name] = ""
+                return df
+        except Exception:
+            pass
+
+    # 3. Jika keduanya kosong
+    df_dummy = pd.DataFrame(
+        columns=[
+            "ID", "Merek", "Model", "Tahun", "Ukuran", 
+            "Panjang", "Lebar", "Tinggi", "Status", "Catatan", 
+            "Foto1", "Foto2", "Foto3", "Foto4"
+        ]
+    )
+    return df_dummy
 
 
 absolute_excel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), EXCEL_FILE) if "__file__" in locals() else EXCEL_FILE
@@ -178,7 +173,7 @@ file_mtime = os.path.getmtime(absolute_excel_path) if os.path.exists(absolute_ex
 
 df = load_data(file_mtime)
 
-# --- PENGAMAN KOLOM OTOMATIS (MENCEGAH KEYERROR JIKA EXCEL KOSONG/RUSAK) ---
+# --- PENGAMAN KOLOM OTOMATIS ---
 if df is None or df.empty:
     df = pd.DataFrame(columns=["ID", "Merek", "Model", "Tahun", "Ukuran", "Panjang", "Lebar", "Tinggi", "Status", "Catatan"])
 
