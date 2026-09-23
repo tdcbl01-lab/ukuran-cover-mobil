@@ -691,6 +691,7 @@ elif menu == "➕ Tambah / Edit Data":
                 else:
                     idx_pilih = match_row.index[0]
 
+                    # --- AMBIL NILAI ASLI DARI BARIS DATABASE YANG DIPILIH ---
                     val_merek_asli = str(df.loc[idx_pilih, "Merek"]) if "Merek" in df.columns else ""
                     val_model_asli = str(df.loc[idx_pilih, "Model"]) if "Model" in df.columns else ""
                     val_tahun_aktif = str(df.loc[idx_pilih, "Tahun"]) if "Tahun" in df.columns else ""
@@ -698,6 +699,7 @@ elif menu == "➕ Tambah / Edit Data":
 
                     st.markdown("Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.", unsafe_allow_html=True)
 
+                    # --- MEREK EDIT ---
                     base_merek_list = sorted([m for m in df["Merek"].dropna().unique() if str(m).strip() != ""])
                     if val_merek_asli not in base_merek_list and val_merek_asli != "":
                         base_merek_list = [val_merek_asli] + base_merek_list
@@ -715,7 +717,6 @@ elif menu == "➕ Tambah / Edit Data":
                     )
 
                     st.markdown("Merek <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                    # PERBAIKAN: Key menggunakan id_terpilih agar nilainya ikut mereset saat berganti ID
                     selected_edit_merek_raw = st.selectbox(
                         "Merek Edit",
                         options=[""] + existing_merek_list_edit,
@@ -729,7 +730,16 @@ elif menu == "➕ Tambah / Edit Data":
                     if input_edit_merek.lower().startswith("add:"):
                         input_edit_merek = input_edit_merek[4:].strip()
 
+                    # PERBAIKAN: Jika user belum mengubah merek di selectbox, gunakan Merek asli dari database row tersebut
+                    if not input_edit_merek:
+                        input_edit_merek = val_merek_asli
+
+                    # --- MODEL EDIT ---
+                    # Filter model berdasarkan merek yang sedang aktif dipilih (atau merek asli jika kosong)
                     df_merek_edit_pilih = df[df["Merek"].astype(str).str.strip().str.lower() == input_edit_merek.lower()]
+                    if df_merek_edit_pilih.empty:
+                        df_merek_edit_pilih = df[df["Merek"].astype(str).str.strip().str.lower() == val_merek_asli.lower()]
+
                     base_model_list_edit = sorted([mo for mo in df_merek_edit_pilih["Model"].dropna().unique() if str(mo).strip() != ""])
                     if val_model_asli not in base_model_list_edit and val_model_asli != "":
                         base_model_list_edit = [val_model_asli] + base_model_list_edit
@@ -747,7 +757,6 @@ elif menu == "➕ Tambah / Edit Data":
                     )
 
                     st.markdown("Model <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                    # PERBAIKAN: Key menggunakan id_terpilih
                     selected_edit_model_raw = st.selectbox(
                         "Model Edit",
                         options=[""] + existing_model_list_edit,
@@ -760,6 +769,9 @@ elif menu == "➕ Tambah / Edit Data":
                     input_edit_model = str(selected_edit_model_raw).strip()
                     if input_edit_model.lower().startswith("add:"):
                         input_edit_model = input_edit_model[4:].strip()
+                    
+                    if not input_edit_model:
+                        input_edit_model = val_model_asli
 
                     st.markdown("Tahun <span style='color:red;'>*</span>", unsafe_allow_html=True)
                     edit_tahun = st.text_input(
@@ -815,11 +827,11 @@ elif menu == "➕ Tambah / Edit Data":
                     col_b1, col_b2 = st.columns(2)
                     with col_b1:
                         if st.button("💾 Simpan Perubahan", type="primary", key=f"btn_save_{id_terpilih}"):
-                            if not str(selected_edit_merek_raw).strip() or not str(selected_edit_model_raw).strip() or not str(edit_tahun).strip():
+                            if not str(input_edit_merek).strip() or not str(input_edit_model).strip() or not str(edit_tahun).strip():
                                 st.error("❌ Gagal! Merek, Model, dan Tahun wajib diisi!")
                             else:
-                                df.loc[idx_pilih, "Merek"] = str(selected_edit_merek_raw).strip()
-                                df.loc[idx_pilih, "Model"] = str(selected_edit_model_raw).strip()
+                                df.loc[idx_pilih, "Merek"] = str(input_edit_merek).strip()
+                                df.loc[idx_pilih, "Model"] = str(input_edit_model).strip()
                                 df.loc[idx_pilih, "Tahun"] = str(edit_tahun).strip()
                                 df.loc[idx_pilih, "Status"] = str(edit_status).strip()
 
