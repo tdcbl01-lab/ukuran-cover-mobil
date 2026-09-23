@@ -279,12 +279,14 @@ def tampilkan_detail_tambahan(hasil_row):
         st.info(f"**Catatan & Riwayat Edit:** {catatan_val}")
 
     list_foto_tersedia = []
+    abs_foto_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), FOTO_FOLDER)
+
     for i in range(1, 5):
         kol_foto = f"Foto{i}"
         if kol_foto in hasil_row.columns:
             val_foto = str(hasil_row[kol_foto].values[0]).strip()
             if val_foto and val_foto.lower() not in ["nan", "none", ""]:
-                path_foto = os.path.join(FOTO_FOLDER, val_foto)
+                path_foto = os.path.join(abs_foto_folder, val_foto)
                 if os.path.exists(path_foto):
                     list_foto_tersedia.append(
                         (
@@ -302,6 +304,10 @@ def tampilkan_detail_tambahan(hasil_row):
                     p_file, cap_text = list_foto_tersedia[i + j]
                     with cols[j]:
                         st.image(p_file, caption=cap_text, use_container_width=True)
+    else:
+        foto_ada_di_db = any(str(hasil_row[f"Foto{i}"].values[0]).strip() not in ["", "nan", "none"] for i in range(1, 5))
+        if foto_ada_di_db:
+            st.caption("ℹ️ Nama file foto tercatat di database, tetapi file fisik gambarnya belum ditemukan di folder server lokal.")
 
 
 kolom_sembunyi = [
