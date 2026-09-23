@@ -271,22 +271,34 @@ def tampilkan_detail_tambahan(hasil_row):
     abs_foto_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), FOTO_FOLDER)
     gdrive_foto_folder = r"G:\My Drive\Database Toko TDC\foto_cover"
 
-    debug_info = []
-
     for i in range(1, 5):
         kol_foto = f"Foto{i}"
         if kol_foto in hasil_row.columns:
             val_foto = str(hasil_row[kol_foto].values[0]).strip()
             if val_foto and val_foto.lower() not in ["nan", "none", ""]:
-                debug_info.append(f"Kolom {kol_foto} mencatat nama file: <b>{val_foto}</b>")
-                
                 path_lokal = os.path.join(abs_foto_folder, val_foto)
                 path_gdrive = os.path.join(gdrive_foto_folder, val_foto)
 
+                found_path = None
                 if os.path.exists(path_lokal):
-                    list_foto_tersedia.append((path_lokal, f"Foto {i}"))
+                    found_path = path_lokal
                 elif os.path.exists(path_gdrive):
-                    list_foto_tersedia.append((path_gdrive, f"Foto {i}"))
+                    found_path = path_gdrive
+                else:
+                    # Pencarian fleksibel untuk mengatasi kendala spasi/case di G Drive
+                    try:
+                        if os.path.exists(gdrive_foto_folder):
+                            files_in_dir = os.listdir(gdrive_foto_folder)
+                            clean_val = val_foto.replace(" ", "").lower()
+                            for f_name in files_in_dir:
+                                if f_name.replace(" ", "").lower() == clean_val:
+                                    found_path = os.path.join(gdrive_foto_folder, f_name)
+                                    break
+                    except Exception:
+                        pass
+
+                if found_path:
+                    list_foto_tersedia.append((found_path, f"Foto {i} - {hasil_row['Merek'].values[0]} {hasil_row['Model'].values[0]}"))
 
     if list_foto_tersedia:
         st.markdown("### 📸 Foto Dokumentasi:")
@@ -301,10 +313,7 @@ def tampilkan_detail_tambahan(hasil_row):
                         except Exception:
                             st.warning(f"Gagal merender file: {cap_text}")
     else:
-        st.warning("⚠️ File fisik foto tidak ditemukan.")
-        if debug_info:
-            st.markdown("<b>Nama file yang dicari dari database:</b><br>" + "<br>".join(debug_info), unsafe_allow_html=True)
-            st.markdown(f"<i>Lokasi folder G Drive yang dicek:</i> <code>{gdrive_foto_folder}</code>", unsafe_allow_html=True)
+        st.info("ℹ️ Nama file foto tercatat di database, tetapi file fisiknya belum ditemukan di folder lokal maupun Google Drive (G:).")
 
 
 kolom_sembunyi = [
