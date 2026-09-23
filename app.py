@@ -666,7 +666,6 @@ elif menu == "➕ Tambah / Edit Data":
             if df_aktif.empty:
                 st.info("Data kosong.")
             else:
-                # PERBAIKAN UTAMA: Petakan pilihan edit menggunakan ID unik agar tidak meleset
                 df_aktif["Pilihan_Edit"] = (
                     "ID " + df_aktif["ID"].astype(str)
                     + " - "
@@ -684,10 +683,8 @@ elif menu == "➕ Tambah / Edit Data":
                     key="select_data_edit_unique",
                 )
                 
-                # Ambil ID asli dari teks pilihan
                 id_terpilih = select_edit_pilihan.split(" - ")[0].replace("ID", "").strip()
                 
-                # Temukan baris DataFrame berdasarkan ID yang akurat
                 match_row = df_aktif[df_aktif["ID"].astype(str).str.strip() == id_terpilih]
                 if match_row.empty:
                     st.error("Data tidak ditemukan.")
@@ -718,13 +715,14 @@ elif menu == "➕ Tambah / Edit Data":
                     )
 
                     st.markdown("Merek <span style='color:red;'>*</span>", unsafe_allow_html=True)
+                    # PERBAIKAN: Key menggunakan id_terpilih agar nilainya ikut mereset saat berganti ID
                     selected_edit_merek_raw = st.selectbox(
                         "Merek Edit",
                         options=[""] + existing_merek_list_edit,
                         index=default_merek_idx,
                         accept_new_options=True,
                         label_visibility="collapsed",
-                        key="edit_merek_selectbox",
+                        key=f"edit_merek_{id_terpilih}",
                     )
 
                     input_edit_merek = str(selected_edit_merek_raw).strip()
@@ -749,13 +747,14 @@ elif menu == "➕ Tambah / Edit Data":
                     )
 
                     st.markdown("Model <span style='color:red;'>*</span>", unsafe_allow_html=True)
+                    # PERBAIKAN: Key menggunakan id_terpilih
                     selected_edit_model_raw = st.selectbox(
                         "Model Edit",
                         options=[""] + existing_model_list_edit,
                         index=default_model_idx,
                         accept_new_options=True,
                         label_visibility="collapsed",
-                        key="edit_model_selectbox",
+                        key=f"edit_model_{id_terpilih}",
                     )
 
                     input_edit_model = str(selected_edit_model_raw).strip()
