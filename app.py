@@ -7,15 +7,12 @@ import pandas as pd
 import requests
 import streamlit as st
 
-# Konfigurasi halaman
 st.set_page_config(page_title="Aplikasi Cover Mobil TDC")
 
-# Folder penyimpanan foto
 FOTO_FOLDER = "foto_cover"
 if not os.path.exists(FOTO_FOLDER):
     os.makedirs(FOTO_FOLDER)
 
-# CSS dasar untuk tabel
 st.markdown(
     """
     <style>
@@ -27,13 +24,10 @@ st.markdown(
 )
 
 EXCEL_FILE = "data_cover.xlsx"
-
-# --- LINK GOOGLE SHEETS ANDA ---
 SHEET_ID = "1embajr0ZrRRCs-pj5gnI32FqTOh3Je44"
 SHEET_NAME = "Sheet1"
 
 
-# --- FUNGSI PENYIMPANAN CERDAS DENGAN PATH ABSOLUT & GITHUB API ---
 def save_data_smart(df_target, file_path, commit_message):
     absolute_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_path) if "__file__" in locals() else file_path
 
@@ -104,12 +98,10 @@ def save_data_smart(df_target, file_path, commit_message):
         return False, str(e)
 
 
-# --- FUNGSI MEMUAT DATA (GOOGLE SHEETS SEBAGAI PRIORITAS UTAMA) ---
 @st.cache_data(show_spinner=False)
 def load_data(file_mtime):
     absolute_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), EXCEL_FILE) if "__file__" in locals() else EXCEL_FILE
     
-    # 1. PRIORITAS UTAMA: Google Sheets via export CSV
     try:
         url_csv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet={SHEET_NAME}"
         r = requests.get(url_csv)
@@ -135,7 +127,6 @@ def load_data(file_mtime):
     except Exception:
         pass
 
-    # 2. CADANGAN: Excel Lokal
     if os.path.exists(absolute_file_path):
         try:
             df = pd.read_excel(absolute_file_path, dtype=str, keep_default_na=False)
@@ -159,7 +150,6 @@ def load_data(file_mtime):
         except Exception:
             pass
 
-    # 3. Dummy Kosong
     df_dummy = pd.DataFrame(
         columns=[
             "ID", "Merek", "Model", "Tahun", "Ukuran", 
@@ -175,7 +165,6 @@ file_mtime = os.path.getmtime(absolute_excel_path) if os.path.exists(absolute_ex
 
 df = load_data(file_mtime)
 
-# --- PENGAMAN KOLOM OTOMATIS ---
 if df is None or df.empty:
     df = pd.DataFrame(columns=["ID", "Merek", "Model", "Tahun", "Ukuran", "Panjang", "Lebar", "Tinggi", "Status", "Catatan"])
 
@@ -282,30 +271,22 @@ def tampilkan_detail_tambahan(hasil_row):
     abs_foto_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), FOTO_FOLDER)
     gdrive_foto_folder = r"G:\My Drive\Database Toko TDC\foto_cover"
 
+    debug_info = []
+
     for i in range(1, 5):
         kol_foto = f"Foto{i}"
         if kol_foto in hasil_row.columns:
             val_foto = str(hasil_row[kol_foto].values[0]).strip()
             if val_foto and val_foto.lower() not in ["nan", "none", ""]:
-                # 1. Cek di folder lokal project
+                debug_info.append(f"Kolom {kol_foto} mencatat nama file: <b>{val_foto}</b>")
+                
                 path_lokal = os.path.join(abs_foto_folder, val_foto)
-                # 2. Cek di folder Google Drive (G:)
                 path_gdrive = os.path.join(gdrive_foto_folder, val_foto)
 
                 if os.path.exists(path_lokal):
-                    list_foto_tersedia.append(
-                        (
-                            path_lokal,
-                            f"Foto {i} - {hasil_row['Merek'].values[0]} {hasil_row['Model'].values[0]}",
-                        )
-                    )
+                    list_foto_tersedia.append((path_lokal, f"Foto {i}"))
                 elif os.path.exists(path_gdrive):
-                    list_foto_tersedia.append(
-                        (
-                            path_gdrive,
-                            f"Foto {i} - {hasil_row['Merek'].values[0]} {hasil_row['Model'].values[0]}",
-                        )
-                    )
+                    list_foto_tersedia.append((path_gdrive, f"Foto {i}"))
 
     if list_foto_tersedia:
         st.markdown("### 📸 Foto Dokumentasi:")
@@ -318,11 +299,12 @@ def tampilkan_detail_tambahan(hasil_row):
                         try:
                             st.image(p_file, caption=cap_text, use_container_width=True)
                         except Exception:
-                            st.warning(f"Gagal merender file gambar: {cap_text}")
+                            st.warning(f"Gagal merender file: {cap_text}")
     else:
-        ada_nama_foto = any(str(hasil_row[f"Foto{i}"].values[0]).strip() not in ["", "nan", "none"] for i in range(1, 5))
-        if ada_nama_foto:
-            st.info("ℹ️ Nama file foto tercatat di database, tetapi file fisiknya belum ditemukan di folder lokal maupun Google Drive (G:).")
+        st.warning("⚠️ File fisik foto tidak ditemukan.")
+        if debug_info:
+            st.markdown("<b>Nama file yang dicari dari database:</b><br>" + "<br>".join(debug_info), unsafe_allow_html=True)
+            st.markdown(f"<i>Lokasi folder G Drive yang dicek:</i> <code>{gdrive_foto_folder}</code>", unsafe_allow_html=True)
 
 
 kolom_sembunyi = [
@@ -704,7 +686,6 @@ elif menu == "➕ Tambah / Edit Data":
 
                 st.markdown("Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.", unsafe_allow_html=True)
 
-                # --- MEREK SELECTBOX ---
                 base_merek_list = sorted([m for m in df["Merek"].dropna().unique() if str(m).strip() != ""])
                 if val_merek_asli not in base_merek_list and val_merek_asli != "":
                     base_merek_list = [val_merek_asli] + base_merek_list
@@ -735,7 +716,6 @@ elif menu == "➕ Tambah / Edit Data":
                 if input_edit_merek.lower().startswith("add:"):
                     input_edit_merek = input_edit_merek[4:].strip()
 
-                # --- MODEL SELECTBOX ---
                 df_merek_edit_pilih = df[df["Merek"].astype(str).str.strip().str.lower() == input_edit_merek.lower()]
                 base_model_list_edit = sorted([mo for mo in df_merek_edit_pilih["Model"].dropna().unique() if str(mo).strip() != ""])
                 if val_model_asli not in base_model_list_edit and val_model_asli != "":
@@ -767,7 +747,6 @@ elif menu == "➕ Tambah / Edit Data":
                 if input_edit_model.lower().startswith("add:"):
                     input_edit_model = input_edit_model[4:].strip()
 
-                # --- INPUT TAHUN & KOLOM LAINNYA ---
                 st.markdown("Tahun <span style='color:red;'>*</span>", unsafe_allow_html=True)
                 edit_tahun = st.text_input(
                     "Tahun Edit",
