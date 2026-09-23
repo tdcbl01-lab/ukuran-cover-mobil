@@ -710,14 +710,51 @@ elif menu == "➕ Tambah / Edit Data":
                     st.markdown(f"**Edit Data untuk ID {id_terpilih}**")
                     st.markdown("Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.", unsafe_allow_html=True)
 
+                    # --- MEREK (Kembali menggunakan selectbox dengan accept_new_options) ---
+                    base_merek_list = sorted([m for m in df["Merek"].dropna().unique() if str(m).strip() != ""])
+                    if val_merek_asli not in base_merek_list and val_merek_asli != "":
+                        base_merek_list = [val_merek_asli] + base_merek_list
+                    
+                    default_merek_idx = base_merek_list.index(val_merek_asli) if val_merek_asli in base_merek_list else 0
+
                     st.markdown("Merek <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                    edit_merek = st.text_input("Edit Merek", value=val_merek_asli, key="edit_merek", label_visibility="collapsed")
-                    
+                    selected_edit_merek_raw = st.selectbox(
+                        "Merek Edit",
+                        options=base_merek_list,
+                        index=default_merek_idx,
+                        accept_new_options=True,
+                        key=f"edit_merek_{id_terpilih}",
+                        label_visibility="collapsed"
+                    )
+                    edit_merek = str(selected_edit_merek_raw).strip()
+                    if edit_merek.lower().startswith("add:"):
+                        edit_merek = edit_merek[4:].strip()
+
+                    # --- MODEL (Kembali menggunakan selectbox dengan accept_new_options berdasarkan merek terpilih) ---
+                    df_merek_edit_pilih = df[df["Merek"].astype(str).str.strip().str.lower() == edit_merek.lower()]
+                    base_model_list_edit = sorted([mo for mo in df_merek_edit_pilih["Model"].dropna().unique() if str(mo).strip() != ""])
+                    if val_model_asli not in base_model_list_edit and val_model_asli != "":
+                        base_model_list_edit = [val_model_asli] + base_model_list_edit
+                    if not base_model_list_edit:
+                        base_model_list_edit = [val_model_asli] if val_model_asli else [""]
+
+                    default_model_idx = base_model_list_edit.index(val_model_asli) if val_model_asli in base_model_list_edit else 0
+
                     st.markdown("Model <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                    edit_model = st.text_input("Edit Model", value=val_model_asli, key="edit_model", label_visibility="collapsed")
-                    
+                    selected_edit_model_raw = st.selectbox(
+                        "Model Edit",
+                        options=base_model_list_edit,
+                        index=default_model_idx,
+                        accept_new_options=True,
+                        key=f"edit_model_{id_terpilih}",
+                        label_visibility="collapsed"
+                    )
+                    edit_model = str(selected_edit_model_raw).strip()
+                    if edit_model.lower().startswith("add:"):
+                        edit_model = edit_model[4:].strip()
+
                     st.markdown("Tahun <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                    edit_tahun = st.text_input("Edit Tahun", value=val_tahun_aktif, key="edit_tahun", label_visibility="collapsed")
+                    edit_tahun = st.text_input("Edit Tahun", value=val_tahun_aktif, key=f"edit_tahun_{id_terpilih}", label_visibility="collapsed")
 
                     edit_sisa_data = {}
                     for col in df.columns:
@@ -731,7 +768,7 @@ elif menu == "➕ Tambah / Edit Data":
                             else:
                                 st.markdown(f"{col}", unsafe_allow_html=True)
                                 
-                            edit_sisa_data[col] = st.text_input(f"Edit {col}", value=val_col_asli, key=f"edit_{col}", label_visibility="collapsed")
+                            edit_sisa_data[col] = st.text_input(f"Edit {col}", value=val_col_asli, key=f"edit_{col}_{id_terpilih}", label_visibility="collapsed")
 
                     try:
                         idx_status_default = list_status_fix.index(val_status_aktif)
@@ -739,22 +776,22 @@ elif menu == "➕ Tambah / Edit Data":
                         idx_status_default = 0
 
                     st.markdown("Status <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                    edit_status = st.selectbox("Edit Status", list_status_fix, index=idx_status_default, key="edit_status", label_visibility="collapsed")
+                    edit_status = st.selectbox("Edit Status", list_status_fix, index=idx_status_default, key=f"edit_status_{id_terpilih}", label_visibility="collapsed")
 
                     st.markdown("---")
                     st.markdown("### 📸 Update Foto Dokumentasi (Opsional):")
                     edit_uploaded_files = {}
                     ec1, ec2 = st.columns(2)
                     with ec1:
-                        edit_uploaded_files["Foto1"] = st.file_uploader("Ganti Foto 1", type=["jpg", "jpeg", "png"], key="edit_up_t1")
-                        edit_uploaded_files["Foto2"] = st.file_uploader("Ganti Foto 2", type=["jpg", "jpeg", "png"], key="edit_up_t2")
+                        edit_uploaded_files["Foto1"] = st.file_uploader("Ganti Foto 1", type=["jpg", "jpeg", "png"], key=f"edit_up_1_{id_terpilih}")
+                        edit_uploaded_files["Foto2"] = st.file_uploader("Ganti Foto 2", type=["jpg", "jpeg", "png"], key=f"edit_up_2_{id_terpilih}")
                     with ec2:
-                        edit_uploaded_files["Foto3"] = st.file_uploader("Ganti Foto 3", type=["jpg", "jpeg", "png"], key="edit_up_t3")
-                        edit_uploaded_files["Foto4"] = st.file_uploader("Ganti Foto 4", type=["jpg", "jpeg", "png"], key="edit_up_t4")
+                        edit_uploaded_files["Foto3"] = st.file_uploader("Ganti Foto 3", type=["jpg", "jpeg", "png"], key=f"edit_up_3_{id_terpilih}")
+                        edit_uploaded_files["Foto4"] = st.file_uploader("Ganti Foto 4", type=["jpg", "jpeg", "png"], key=f"edit_up_4_{id_terpilih}")
 
                     col_b1, col_b2 = st.columns(2)
                     with col_b1:
-                        if st.button("💾 Simpan Perubahan", type="primary", key="btn_save_edit_data"):
+                        if st.button("💾 Simpan Perubahan", type="primary", key=f"btn_save_{id_terpilih}"):
                             if not str(edit_merek).strip() or not str(edit_model).strip() or not str(edit_tahun).strip():
                                 st.error("❌ Gagal! Merek, Model, dan Tahun wajib diisi dengan benar!")
                             else:
@@ -809,7 +846,7 @@ elif menu == "➕ Tambah / Edit Data":
                                     st.error("❌ Terjadi kesalahan indeks baris data.")
 
                     with col_b2:
-                        if st.button("🗑️ Hapus Data Ini", type="secondary", key="btn_del_edit_data"):
+                        if st.button("🗑️ Hapus Data Ini", type="secondary", key=f"btn_del_{id_terpilih}"):
                             df_edit_db = df.drop(idx_pilih).reset_index(drop=True)
                             if "ID" in df_edit_db.columns and not df_edit_db.empty:
                                 df_edit_db["ID"] = (df_edit_db.index + 1).astype(str)
