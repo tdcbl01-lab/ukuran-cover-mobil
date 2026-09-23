@@ -287,10 +287,19 @@ def tampilkan_detail_tambahan(hasil_row):
             val_foto = str(hasil_row[kol_foto].values[0]).strip()
             if val_foto and val_foto.lower() not in ["nan", "none", ""]:
                 path_foto = os.path.join(abs_foto_folder, val_foto)
+                # Jika file ada secara lokal, pakai lokal
                 if os.path.exists(path_foto):
                     list_foto_tersedia.append(
                         (
                             path_foto,
+                            f"Foto {i} - {hasil_row['Merek'].values[0]} {hasil_row['Model'].values[0]}",
+                        )
+                    )
+                else:
+                    # Jika tersimpan via GitHub / URL publik, coba baca langsung sebagai link
+                    list_foto_tersedia.append(
+                        (
+                            val_foto,
                             f"Foto {i} - {hasil_row['Merek'].values[0]} {hasil_row['Model'].values[0]}",
                         )
                     )
@@ -303,11 +312,10 @@ def tampilkan_detail_tambahan(hasil_row):
                 if i + j < len(list_foto_tersedia):
                     p_file, cap_text = list_foto_tersedia[i + j]
                     with cols[j]:
-                        st.image(p_file, caption=cap_text, use_container_width=True)
-    else:
-        foto_ada_di_db = any(str(hasil_row[f"Foto{i}"].values[0]).strip() not in ["", "nan", "none"] for i in range(1, 5))
-        if foto_ada_di_db:
-            st.caption("ℹ️ Nama file foto tercatat di database, tetapi file fisik gambarnya belum ditemukan di folder server lokal.")
+                        try:
+                            st.image(p_file, caption=cap_text, use_container_width=True)
+                        except Exception:
+                            st.warning(f"Gagal memuat gambar: {cap_text}")
 
 
 kolom_sembunyi = [
