@@ -281,7 +281,6 @@ def tampilkan_detail_tambahan(hasil_row):
                 if os.path.exists(path_lokal):
                     found_path = path_lokal
                 else:
-                    # Cari fleksibel di folder lokal project untuk mengabaikan perbedaan spasi
                     try:
                         if os.path.exists(abs_foto_folder):
                             files_in_dir = os.listdir(abs_foto_folder)
@@ -663,13 +662,13 @@ elif menu == "➕ Tambah / Edit Data":
                             st.error(f"❌ Gagal menyimpan data: {err_msg}")
 
         elif mode_kelola == "✏️ Edit Data yang Ada":
-            df_aktif = df[df["ID"].astype(str).str.strip() != ""]
+            df_aktif = df[df["ID"].astype(str).str.strip() != ""].copy()
             if df_aktif.empty:
                 st.info("Data kosong.")
             else:
-                df_aktif = df_aktif.copy()
+                # PERBAIKAN UTAMA: Petakan pilihan edit menggunakan ID unik agar tidak meleset
                 df_aktif["Pilihan_Edit"] = (
-                    df_aktif.index.astype(str)
+                    "ID " + df_aktif["ID"].astype(str)
                     + " - "
                     + df_aktif["Merek"]
                     + " "
@@ -679,189 +678,198 @@ elif menu == "➕ Tambah / Edit Data":
                     + ")"
                 )
 
-                idx_str = st.selectbox(
+                select_edit_pilihan = st.selectbox(
                     "Pilih Data:",
                     df_aktif["Pilihan_Edit"].unique(),
                     key="select_data_edit_unique",
                 )
-                idx_pilih = int(idx_str.split(" - ")[0])
+                
+                # Ambil ID asli dari teks pilihan
+                id_terpilih = select_edit_pilihan.split(" - ")[0].replace("ID", "").strip()
+                
+                # Temukan baris DataFrame berdasarkan ID yang akurat
+                match_row = df_aktif[df_aktif["ID"].astype(str).str.strip() == id_terpilih]
+                if match_row.empty:
+                    st.error("Data tidak ditemukan.")
+                else:
+                    idx_pilih = match_row.index[0]
 
-                val_merek_asli = str(df.loc[idx_pilih, "Merek"]) if "Merek" in df.columns else ""
-                val_model_asli = str(df.loc[idx_pilih, "Model"]) if "Model" in df.columns else ""
-                val_tahun_aktif = str(df.loc[idx_pilih, "Tahun"]) if "Tahun" in df.columns else ""
-                val_status_aktif = str(df.loc[idx_pilih, "Status"]) if "Status" in df.columns else "STANDAR"
+                    val_merek_asli = str(df.loc[idx_pilih, "Merek"]) if "Merek" in df.columns else ""
+                    val_model_asli = str(df.loc[idx_pilih, "Model"]) if "Model" in df.columns else ""
+                    val_tahun_aktif = str(df.loc[idx_pilih, "Tahun"]) if "Tahun" in df.columns else ""
+                    val_status_aktif = str(df.loc[idx_pilih, "Status"]) if "Status" in df.columns else "STANDAR"
 
-                st.markdown("Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.", unsafe_allow_html=True)
+                    st.markdown("Kolom dengan tanda <span style='color:red;'>*</span> wajib diisi.", unsafe_allow_html=True)
 
-                base_merek_list = sorted([m for m in df["Merek"].dropna().unique() if str(m).strip() != ""])
-                if val_merek_asli not in base_merek_list and val_merek_asli != "":
-                    base_merek_list = [val_merek_asli] + base_merek_list
+                    base_merek_list = sorted([m for m in df["Merek"].dropna().unique() if str(m).strip() != ""])
+                    if val_merek_asli not in base_merek_list and val_merek_asli != "":
+                        base_merek_list = [val_merek_asli] + base_merek_list
 
-                extended_merek_set_edit = set(base_merek_list)
-                for m in base_merek_list:
-                    extended_merek_set_edit.add(m.lower())
-                    extended_merek_set_edit.add(m.upper())
-                existing_merek_list_edit = sorted(list(extended_merek_set_edit))
+                    extended_merek_set_edit = set(base_merek_list)
+                    for m in base_merek_list:
+                        extended_merek_set_edit.add(m.lower())
+                        extended_merek_set_edit.add(m.upper())
+                    existing_merek_list_edit = sorted(list(extended_merek_set_edit))
 
-                default_merek_idx = (
-                    existing_merek_list_edit.index(val_merek_asli) + 1
-                    if val_merek_asli in existing_merek_list_edit
-                    else 0
-                )
+                    default_merek_idx = (
+                        existing_merek_list_edit.index(val_merek_asli) + 1
+                        if val_merek_asli in existing_merek_list_edit
+                        else 0
+                    )
 
-                st.markdown("Merek <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                selected_edit_merek_raw = st.selectbox(
-                    "Merek Edit",
-                    options=[""] + existing_merek_list_edit,
-                    index=default_merek_idx,
-                    accept_new_options=True,
-                    label_visibility="collapsed",
-                    key="edit_merek_selectbox",
-                )
+                    st.markdown("Merek <span style='color:red;'>*</span>", unsafe_allow_html=True)
+                    selected_edit_merek_raw = st.selectbox(
+                        "Merek Edit",
+                        options=[""] + existing_merek_list_edit,
+                        index=default_merek_idx,
+                        accept_new_options=True,
+                        label_visibility="collapsed",
+                        key="edit_merek_selectbox",
+                    )
 
-                input_edit_merek = str(selected_edit_merek_raw).strip()
-                if input_edit_merek.lower().startswith("add:"):
-                    input_edit_merek = input_edit_merek[4:].strip()
+                    input_edit_merek = str(selected_edit_merek_raw).strip()
+                    if input_edit_merek.lower().startswith("add:"):
+                        input_edit_merek = input_edit_merek[4:].strip()
 
-                df_merek_edit_pilih = df[df["Merek"].astype(str).str.strip().str.lower() == input_edit_merek.lower()]
-                base_model_list_edit = sorted([mo for mo in df_merek_edit_pilih["Model"].dropna().unique() if str(mo).strip() != ""])
-                if val_model_asli not in base_model_list_edit and val_model_asli != "":
-                    base_model_list_edit = [val_model_asli] + base_model_list_edit
+                    df_merek_edit_pilih = df[df["Merek"].astype(str).str.strip().str.lower() == input_edit_merek.lower()]
+                    base_model_list_edit = sorted([mo for mo in df_merek_edit_pilih["Model"].dropna().unique() if str(mo).strip() != ""])
+                    if val_model_asli not in base_model_list_edit and val_model_asli != "":
+                        base_model_list_edit = [val_model_asli] + base_model_list_edit
 
-                extended_model_set_edit = set(base_model_list_edit)
-                for mo in base_model_list_edit:
-                    extended_model_set_edit.add(mo.lower())
-                    extended_model_set_edit.add(mo.upper())
-                existing_model_list_edit = sorted(list(extended_model_set_edit))
+                    extended_model_set_edit = set(base_model_list_edit)
+                    for mo in base_model_list_edit:
+                        extended_model_set_edit.add(mo.lower())
+                        extended_model_set_edit.add(mo.upper())
+                    existing_model_list_edit = sorted(list(extended_model_set_edit))
 
-                default_model_idx = (
-                    existing_model_list_edit.index(val_model_asli) + 1
-                    if val_model_asli in existing_model_list_edit
-                    else 0
-                )
+                    default_model_idx = (
+                        existing_model_list_edit.index(val_model_asli) + 1
+                        if val_model_asli in existing_model_list_edit
+                        else 0
+                    )
 
-                st.markdown("Model <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                selected_edit_model_raw = st.selectbox(
-                    "Model Edit",
-                    options=[""] + existing_model_list_edit,
-                    index=default_model_idx,
-                    accept_new_options=True,
-                    label_visibility="collapsed",
-                    key="edit_model_selectbox",
-                )
+                    st.markdown("Model <span style='color:red;'>*</span>", unsafe_allow_html=True)
+                    selected_edit_model_raw = st.selectbox(
+                        "Model Edit",
+                        options=[""] + existing_model_list_edit,
+                        index=default_model_idx,
+                        accept_new_options=True,
+                        label_visibility="collapsed",
+                        key="edit_model_selectbox",
+                    )
 
-                input_edit_model = str(selected_edit_model_raw).strip()
-                if input_edit_model.lower().startswith("add:"):
-                    input_edit_model = input_edit_model[4:].strip()
+                    input_edit_model = str(selected_edit_model_raw).strip()
+                    if input_edit_model.lower().startswith("add:"):
+                        input_edit_model = input_edit_model[4:].strip()
 
-                st.markdown("Tahun <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                edit_tahun = st.text_input(
-                    "Tahun Edit",
-                    value=val_tahun_aktif,
-                    label_visibility="collapsed",
-                    key=f"edit_tahun_{idx_pilih}",
-                )
+                    st.markdown("Tahun <span style='color:red;'>*</span>", unsafe_allow_html=True)
+                    edit_tahun = st.text_input(
+                        "Tahun Edit",
+                        value=val_tahun_aktif,
+                        label_visibility="collapsed",
+                        key=f"edit_tahun_{id_terpilih}",
+                    )
 
-                edit_sisa_data = {}
-                for col in df.columns:
-                    if col not in ["ID", "Pilihan_Edit", "Merek", "Model", "Tahun", "Status"] + kolom_foto_list:
-                        val_col_aktif = str(df.loc[idx_pilih, col]) if col in df.columns else ""
-                        if val_col_aktif.lower() in ["nan", "none"]:
-                            val_col_aktif = ""
-                        
-                        if col in kolom_wajib:
-                            st.markdown(f"{col} <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"{col}", unsafe_allow_html=True)
+                    edit_sisa_data = {}
+                    for col in df.columns:
+                        if col not in ["ID", "Pilihan_Edit", "Merek", "Model", "Tahun", "Status"] + kolom_foto_list:
+                            val_col_aktif = str(df.loc[idx_pilih, col]) if col in df.columns else ""
+                            if val_col_aktif.lower() in ["nan", "none"]:
+                                val_col_aktif = ""
                             
-                        edit_sisa_data[col] = st.text_input(
-                            f"edit_{col}",
-                            value=val_col_aktif,
-                            label_visibility="collapsed",
-                            key=f"edit_{col}_{idx_pilih}",
-                        )
+                            if col in kolom_wajib:
+                                st.markdown(f"{col} <span style='color:red;'>*</span>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"{col}", unsafe_allow_html=True)
+                                
+                            edit_sisa_data[col] = st.text_input(
+                                f"edit_{col}",
+                                value=val_col_aktif,
+                                label_visibility="collapsed",
+                                key=f"edit_{col}_{id_terpilih}",
+                            )
 
-                try:
-                    status_idx = list_status_fix.index(val_status_aktif)
-                except ValueError:
-                    status_idx = 0
-                st.markdown("Status <span style='color:red;'>*</span>", unsafe_allow_html=True)
-                edit_status = st.selectbox(
-                    "Status Edit",
-                    list_status_fix,
-                    index=status_idx,
-                    label_visibility="collapsed",
-                    key=f"edit_status_{idx_pilih}",
-                )
+                    try:
+                        status_idx = list_status_fix.index(val_status_aktif)
+                    except ValueError:
+                        status_idx = 0
+                    st.markdown("Status <span style='color:red;'>*</span>", unsafe_allow_html=True)
+                    edit_status = st.selectbox(
+                        "Status Edit",
+                        list_status_fix,
+                        index=status_idx,
+                        label_visibility="collapsed",
+                        key=f"edit_status_{id_terpilih}",
+                    )
 
-                st.markdown("---")
-                st.markdown("### 📸 Perbarui Foto Dokumentasi:")
-                edit_uploaded_files = {}
-                c1, c2 = st.columns(2)
-                with c1:
-                    edit_uploaded_files["Foto1"] = st.file_uploader("Ganti Foto 1", type=["jpg", "jpeg", "png"], key=f"edit_up_1_{idx_pilih}")
-                    edit_uploaded_files["Foto2"] = st.file_uploader("Ganti Foto 2", type=["jpg", "jpeg", "png"], key=f"edit_up_2_{idx_pilih}")
-                with c2:
-                    edit_uploaded_files["Foto3"] = st.file_uploader("Ganti Foto 3", type=["jpg", "jpeg", "png"], key=f"edit_up_3_{idx_pilih}")
-                    edit_uploaded_files["Foto4"] = st.file_uploader("Ganti Foto 4", type=["jpg", "jpeg", "png"], key=f"edit_up_4_{idx_pilih}")
+                    st.markdown("---")
+                    st.markdown("### 📸 Perbarui Foto Dokumentasi:")
+                    edit_uploaded_files = {}
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        edit_uploaded_files["Foto1"] = st.file_uploader("Ganti Foto 1", type=["jpg", "jpeg", "png"], key=f"edit_up_1_{id_terpilih}")
+                        edit_uploaded_files["Foto2"] = st.file_uploader("Ganti Foto 2", type=["jpg", "jpeg", "png"], key=f"edit_up_2_{id_terpilih}")
+                    with c2:
+                        edit_uploaded_files["Foto3"] = st.file_uploader("Ganti Foto 3", type=["jpg", "jpeg", "png"], key=f"edit_up_3_{id_terpilih}")
+                        edit_uploaded_files["Foto4"] = st.file_uploader("Ganti Foto 4", type=["jpg", "jpeg", "png"], key=f"edit_up_4_{id_terpilih}")
 
-                col_b1, col_b2 = st.columns(2)
-                with col_b1:
-                    if st.button("💾 Simpan Perubahan", type="primary", key=f"btn_save_{idx_pilih}"):
-                        if not str(selected_edit_merek_raw).strip() or not str(selected_edit_model_raw).strip() or not str(edit_tahun).strip():
-                            st.error("❌ Gagal! Merek, Model, dan Tahun wajib diisi!")
-                        else:
-                            df.loc[idx_pilih, "Merek"] = str(selected_edit_merek_raw).strip()
-                            df.loc[idx_pilih, "Model"] = str(selected_edit_model_raw).strip()
-                            df.loc[idx_pilih, "Tahun"] = str(edit_tahun).strip()
-                            df.loc[idx_pilih, "Status"] = str(edit_status).strip()
+                    col_b1, col_b2 = st.columns(2)
+                    with col_b1:
+                        if st.button("💾 Simpan Perubahan", type="primary", key=f"btn_save_{id_terpilih}"):
+                            if not str(selected_edit_merek_raw).strip() or not str(selected_edit_model_raw).strip() or not str(edit_tahun).strip():
+                                st.error("❌ Gagal! Merek, Model, dan Tahun wajib diisi!")
+                            else:
+                                df.loc[idx_pilih, "Merek"] = str(selected_edit_merek_raw).strip()
+                                df.loc[idx_pilih, "Model"] = str(selected_edit_model_raw).strip()
+                                df.loc[idx_pilih, "Tahun"] = str(edit_tahun).strip()
+                                df.loc[idx_pilih, "Status"] = str(edit_status).strip()
 
-                            for k, v in edit_sisa_data.items():
-                                df.loc[idx_pilih, k] = str(v).strip()
+                                for k, v in edit_sisa_data.items():
+                                    df.loc[idx_pilih, k] = str(v).strip()
 
-                            timestamp_awalan = int(datetime.now().timestamp())
-                            for key_f, up_f in edit_uploaded_files.items():
-                                if up_f is not None:
-                                    nama_file_foto = f"{timestamp_awalan}_{key_f}_{up_f.name}"
-                                    path_simpan = os.path.join(FOTO_FOLDER, nama_file_foto)
-                                    with open(path_simpan, "wb") as f:
-                                        f.write(up_f.getbuffer())
-                                    df.loc[idx_pilih, key_f] = nama_file_foto
+                                timestamp_awalan = int(datetime.now().timestamp())
+                                for key_f, up_f in edit_uploaded_files.items():
+                                    if up_f is not None:
+                                        nama_file_foto = f"{timestamp_awalan}_{key_f}_{up_f.name}"
+                                        path_simpan = os.path.join(FOTO_FOLDER, nama_file_foto)
+                                        with open(path_simpan, "wb") as f:
+                                            f.write(up_f.getbuffer())
+                                        df.loc[idx_pilih, key_f] = nama_file_foto
+
+                                sukses_simpan, err_msg = save_data_smart(
+                                    df,
+                                    EXCEL_FILE,
+                                    f"Update data ID {id_terpilih} via Streamlit",
+                                )
+
+                                if sukses_simpan:
+                                    st.cache_data.clear()
+                                    st.session_state["popup_title"] = "Berhasil!"
+                                    st.session_state["popup_msg"] = "Perubahan data berhasil disimpan secara permanen!"
+                                    st.session_state["popup_type"] = "success"
+                                    st.session_state["show_popup"] = "aktif"
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ Gagal memperbarui data: {err_msg}")
+
+                    with col_b2:
+                        if st.button("🗑️ Hapus Data Ini", type="secondary", key=f"btn_del_{id_terpilih}"):
+                            df = df.drop(idx_pilih).reset_index(drop=True)
+                            if "ID" in df.columns and not df.empty:
+                                df["ID"] = (df.index + 1).astype(str)
 
                             sukses_simpan, err_msg = save_data_smart(
                                 df,
                                 EXCEL_FILE,
-                                f"Update data ID {df.loc[idx_pilih, 'ID']} via Streamlit",
+                                f"Hapus data ID {id_terpilih} via Streamlit",
                             )
 
                             if sukses_simpan:
                                 st.cache_data.clear()
-                                st.session_state["popup_title"] = "Berhasil!"
-                                st.session_state["popup_msg"] = "Perubahan data berhasil disimpan secara permanen!"
+                                st.session_state["popup_title"] = "Berhasil Dihapus!"
+                                st.session_state["popup_msg"] = "Data berhasil dihapus dari database."
                                 st.session_state["popup_type"] = "success"
                                 st.session_state["show_popup"] = "aktif"
                                 st.rerun()
                             else:
-                                st.error(f"❌ Gagal memperbarui data: {err_msg}")
-
-                with col_b2:
-                    if st.button("🗑️ Hapus Data Ini", type="secondary", key=f"btn_del_{idx_pilih}"):
-                        df = df.drop(idx_pilih).reset_index(drop=True)
-                        if "ID" in df.columns and not df.empty:
-                            df["ID"] = (df.index + 1).astype(str)
-
-                        sukses_simpan, err_msg = save_data_smart(
-                            df,
-                            EXCEL_FILE,
-                            f"Hapus data ID {df.loc[idx_pilih, 'ID']} via Streamlit",
-                        )
-
-                        if sukses_simpan:
-                            st.cache_data.clear()
-                            st.session_state["popup_title"] = "Berhasil Dihapus!"
-                            st.session_state["popup_msg"] = "Data berhasil dihapus dari database."
-                            st.session_state["popup_type"] = "success"
-                            st.session_state["show_popup"] = "aktif"
-                            st.rerun()
-                        else:
-                            st.error(f"❌ Gagal menghapus data: {err_msg}")
+                                st.error(f"❌ Gagal menghapus data: {err_msg}")
