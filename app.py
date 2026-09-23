@@ -280,26 +280,29 @@ def tampilkan_detail_tambahan(hasil_row):
 
     list_foto_tersedia = []
     abs_foto_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), FOTO_FOLDER)
+    gdrive_foto_folder = r"G:\My Drive\Database Toko TDC\foto_cover"
 
     for i in range(1, 5):
         kol_foto = f"Foto{i}"
         if kol_foto in hasil_row.columns:
             val_foto = str(hasil_row[kol_foto].values[0]).strip()
             if val_foto and val_foto.lower() not in ["nan", "none", ""]:
-                path_foto = os.path.join(abs_foto_folder, val_foto)
-                # Jika file ada secara lokal, pakai lokal
-                if os.path.exists(path_foto):
+                # 1. Cek di folder lokal project
+                path_lokal = os.path.join(abs_foto_folder, val_foto)
+                # 2. Cek di folder Google Drive (G:)
+                path_gdrive = os.path.join(gdrive_foto_folder, val_foto)
+
+                if os.path.exists(path_lokal):
                     list_foto_tersedia.append(
                         (
-                            path_foto,
+                            path_lokal,
                             f"Foto {i} - {hasil_row['Merek'].values[0]} {hasil_row['Model'].values[0]}",
                         )
                     )
-                else:
-                    # Jika tersimpan via GitHub / URL publik, coba baca langsung sebagai link
+                elif os.path.exists(path_gdrive):
                     list_foto_tersedia.append(
                         (
-                            val_foto,
+                            path_gdrive,
                             f"Foto {i} - {hasil_row['Merek'].values[0]} {hasil_row['Model'].values[0]}",
                         )
                     )
@@ -315,7 +318,11 @@ def tampilkan_detail_tambahan(hasil_row):
                         try:
                             st.image(p_file, caption=cap_text, use_container_width=True)
                         except Exception:
-                            st.warning(f"Gagal memuat gambar: {cap_text}")
+                            st.warning(f"Gagal merender file gambar: {cap_text}")
+    else:
+        ada_nama_foto = any(str(hasil_row[f"Foto{i}"].values[0]).strip() not in ["", "nan", "none"] for i in range(1, 5))
+        if ada_nama_foto:
+            st.info("ℹ️ Nama file foto tercatat di database, tetapi file fisiknya belum ditemukan di folder lokal maupun Google Drive (G:).")
 
 
 kolom_sembunyi = [
